@@ -17,6 +17,15 @@ import {
   type AlertLocalState,
 } from "./alertStore.js";
 import { h } from "../../ui/dom.js";
+import { alertScopeKey } from "./alertStore.js";
+import { DEFAULT_ALERT_QUERY, exportAlertCsv, selectAlertPage, type AlertQuery } from "./alertView.js";
+
+/** Session-only search/page preferences, never persisted with BGS evidence or alert settings. */
+const viewCache = new Map<string, AlertQuery>();
+function viewPreferences(key: string): AlertQuery {
+  if (!viewCache.has(key) && viewCache.size >= 24) viewCache.delete(viewCache.keys().next().value!);
+  return viewCache.get(key) ?? { ...DEFAULT_ALERT_QUERY };
+}
 import { notify } from "../../ui/notifier.js";
 
 const TYPES: { id: AlertKind; label: string }[] = [
@@ -56,8 +65,8 @@ export function mountBgsAlertPanel(state: BgsState, scope: AlertScope): HTMLElem
   const muted = new Set(local.muted);
   const visible = alerts.filter((item) => !muted.has(item.id));
   const mutedCount = alerts.length - visible.length;
-  const limit = 80;
-  const shown = visible.slice(0, limit);
+  const viewKey = alertScopeKey(scope);
+  let view = viewPreferences(viewKey);
   const panel = h("section.card.bgs-panel.edch-bgs-alert-panel", null);
   const rerender = (): void => { panel.replaceWith(mountBgsAlertPanel(state, scope)); };
   function storeSettings(settings: AlertSettings): void {
@@ -83,8 +92,68 @@ export function mountBgsAlertPanel(state: BgsState, scope: AlertScope): HTMLElem
         storeSettings({ ...local.settings, [key]: Math.round(Math.min(max, Math.max(min, value))) });
       },
     }));
+  const body = h("tbody", null);
+  const resultsStatus = h("span", { role: "status", "aria-live": "polite" }, "");
+  const previous = h("button", { type: "button", onclick: () => { view = { ...view, page: view.page - 1 }; renderPage(); } }, "Page précédente");
+  const next = h("button", { type: "button", onclick: () => { view = { ...view, page: view.page + 1 }; renderPage(); } }, "Page suivante");
+  const exportButton = h("button", { type: "button", onclick: () => {
+    const selected = selectAlertPage(visible, view);
+    if (!selected.total) return;
+    const url = URL.createObjectURL(new Blob([exportAlertCsv(selected.filtered)], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "EDCH-BGS-alertes-filtrees.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  } }, "Exporter les résultats CSV");
+  function renderPage(): void {
+    const selection = selectAlertPage(visible, view);
+    view = { ...view, page: selection.page };
+    viewCache.set(viewKey, view);
+    body.replaceChildren(...(selection.rows.length ? selection.rows.map((alert) => h("tr", null,
+      h("td", null, LEVEL[alert.severity]),
+      h("td", null, alert.system),
+      h("td", null, alert.text),
+      h("td", null, formatTime(alert.evidenceAt)),
+      h("td", null, h("button", { type: "button", onclick: () => {
+        local = muteAlert(local, alert.id);
+        saveAlertState(scope, local);
+        rerender();
+      } }, "Masquer")),
+    )) : [h("tr", null, h("td", { colSpan: 5 }, "Aucune alerte pour cette recherche."))]));
+    resultsStatus.textContent = `${selection.from}–${selection.to} sur ${selection.total} alertes filtrées · page ${selection.page}/${selection.pages}`;
+    previous.disabled = selection.page <= 1;
+    next.disabled = selection.page >= selection.pages;
+    exportButton.disabled = selection.total === 0;
+  }
+  const filterControls = h("div.bgs-actions.edch-bgs-alert-filters", null,
+    h("label", null, "Rechercher un système ", h("input", {
+      type: "search", maxLength: 120, placeholder: "Nom ou observation", value: view.query,
+      oninput: (event: Event) => {
+        view = { ...view, query: (event.target as HTMLInputElement).value, page: 1 };
+        renderPage();
+      },
+    })),
+    h("label", null, "Priorité ", h("select", { value: view.severity,
+      onchange: (event: Event) => { view = { ...view, severity: (event.target as HTMLSelectElement).value as AlertQuery["severity"], page: 1 }; renderPage(); },
+    },
+    h("option", { value: "all", selected: view.severity === "all" }, "Toutes"),
+    h("option", { value: "critical", selected: view.severity === "critical" }, "Élevée"),
+    h("option", { value: "warning", selected: view.severity === "warning" }, "À vérifier"),
+    h("option", { value: "info", selected: view.severity === "info" }, "Suivi"))),
+    h("label", null, "Type ", h("select", {
+      onchange: (event: Event) => { view = { ...view, kind: (event.target as HTMLSelectElement).value as AlertQuery["kind"], page: 1 }; renderPage(); },
+    },
+    h("option", { value: "all", selected: view.kind === "all" }, "Tous les types"),
+    ...TYPES.map((item) => h("option", { value: item.id, selected: view.kind === item.id }, item.label)))),
+    h("label", null, "Par page ", h("select", {
+      onchange: (event: Event) => { view = { ...view, pageSize: Number((event.target as HTMLSelectElement).value), page: 1 }; renderPage(); },
+    }, ...[20, 40, 80].map((size) => h("option", { value: String(size), selected: view.pageSize === size }, String(size))))),
+  );
   panel.append(
-    h("h2", null, "Alertes BGS · v1.5.4"),
+    h("h2", null, "Alertes BGS · v1.6.2"),
     h("p.sub", null,
       "Règles locales fondées sur les observations Spansh et les visites enregistrées dans EDCH. Les variations ne prouvent pas un tick ; les alertes ne commandent jamais le jeu. Aucun Mistral."),
     h("p.sub", null, `Périmètre : CMDR ${scope.commander} · Faction ${scope.faction}`),
@@ -111,21 +180,16 @@ export function mountBgsAlertPanel(state: BgsState, scope: AlertScope): HTMLElem
         local = clearMutedAlerts(local); saveAlertState(scope, local); rerender();
       } }, "Réactiver les alertes masquées"),
     ),
+    filterControls,
     h("div.bgs-table-scroll", null,
       h("table.bgs-table", null,
         h("thead", null, h("tr", null, ...["Priorité", "Système", "Observation", "Date", "Action"].map((x) => h("th", null, x)))),
-        h("tbody", null, ...(shown.length ? shown.map((alert) => h("tr", null,
-          h("td", null, LEVEL[alert.severity]),
-          h("td", null, alert.system),
-          h("td", null, alert.text),
-          h("td", null, formatTime(alert.evidenceAt)),
-          h("td", null, h("button", { type: "button", onclick: () => {
-            local = muteAlert(local, alert.id); saveAlertState(scope, local); rerender();
-          } }, "Masquer")),
-        )) : [h("tr", null, h("td", { colSpan: 5 }, "Aucune alerte avec les filtres actuels."))])),
+        body,
       ),
     ),
-    visible.length > limit ? h("p.sub", null, `${limit} premières alertes affichées. Ajuste les filtres pour réduire cette liste.`) : h("span", { hidden: true }),
+    h("div.bgs-actions.edch-bgs-alert-pagination", null, previous, resultsStatus, next, exportButton),
+    alerts.length >= 500 ? h("p.sub", null, "L'analyse est limitée à 500 alertes. Actualise les relevés et ajuste les catégories si nécessaire.") : h("span", { hidden: true }),
   );
+  renderPage();
   return panel;
 }
