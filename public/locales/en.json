@@ -2,6 +2,8 @@
   "about": {
     "aboutEdch": "About EDCH",
     "author": "The author",
+    "communityContributorTitle": "Community development contribution",
+    "communityContributorDescription": "contributed to the development and coding of the unofficial EDCH BGS / Manjaro extensions, including BGS tracking, patrols, French control labels and stability fixes.",
     "bugsAreReportedGithubDebugLog": "Bugs are reported on GitHub, with the debug log: it's what shows what happened.",
     "buildExportFormatImportedIntoWishlist": "Build export format imported into the wishlist",
     "buildExportFormatImportedIntoWishlist2": "Build export format imported into the wishlist, and the Frame Shift Drive figures for the exact route (coriolis-data)",

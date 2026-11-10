@@ -2,6 +2,8 @@
   "about": {
     "aboutEdch": "À propos d'EDCH",
     "author": "L'auteur",
+    "communityContributorTitle": "Participation au développement",
+    "communityContributorDescription": "a participé au développement et au codage des extensions communautaires non officielles EDCH BGS / Manjaro : suivi BGS, patrouilles, libellés des commandes en français et corrections de stabilité.",
     "bugsAreReportedGithubDebugLog": "Les bugs se signalent sur GitHub, avec le log debug : c'est lui qui permet de comprendre ce qui s'est passé.",
     "buildExportFormatImportedIntoWishlist": "Format d'export de builds importé dans la wishlist",
     "buildExportFormatImportedIntoWishlist2": "Format d'export de builds importé dans la wishlist, et les caractéristiques des réacteurs FSD pour l'itinéraire exact (coriolis-data)",

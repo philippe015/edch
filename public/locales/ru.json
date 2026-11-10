@@ -2,6 +2,8 @@
   "about": {
     "aboutEdch": "О программе EDCH",
     "author": "Автор",
+    "communityContributorTitle": "Вклад в разработку сообщества",
+    "communityContributorDescription": "участвовал в разработке и программировании неофициальных дополнений EDCH BGS / Manjaro, включая отслеживание BGS, патрулирование, французские названия команд управления и исправления стабильности.",
     "bugsAreReportedGithubDebugLog": "Об ошибках сообщают на GitHub, приложив отладочный журнал: именно он показывает, что произошло.",
     "buildExportFormatImportedIntoWishlist": "Формат экспорта сборок, импортируемый в список желаний",
     "buildExportFormatImportedIntoWishlist2": "Формат экспорта сборок для списка желаний и характеристики FSD для точного маршрута (coriolis-data)",

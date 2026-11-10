@@ -1,6 +1,8 @@
 //! EDCH-COG-MEMORY-v1.5.3 — local per-commander/per-faction SQLite memory.
 //! Does not modify the existing BGS database, Elite Dangerous journals, or binds.
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OpenFlags};
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
@@ -117,9 +119,170 @@ pub async fn agent_memory_delete(
     }).await.map_err(|e| e.to_string())?
 }
 
+
+// EDCH-COG-STABILISATION-v1.6.1: consistent SQLite snapshots, never copy a WAL DB file directly.
+const BACKUP_PREFIX: &str = "edch-agent-memory-backup-";
+const BACKUP_SUFFIX: &str = ".sqlite3";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentMemoryBackup {
+    name: String,
+    bytes: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentMemoryDiagnostic {
+    healthy: bool,
+    items: i64,
+    backups: usize,
+}
+
+fn backups_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let base = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let dir = base.join("agent-memory-backups");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    if std::fs::symlink_metadata(&dir).map_err(|e| e.to_string())?.file_type().is_symlink() {
+        return Err("agentMemoryUnsafeBackupDirectory".into());
+    }
+    Ok(dir)
+}
+
+fn backup_name_is_safe(name: &str) -> bool {
+    name.len() > BACKUP_PREFIX.len() + BACKUP_SUFFIX.len() &&
+        name.starts_with(BACKUP_PREFIX) && name.ends_with(BACKUP_SUFFIX) &&
+        name[BACKUP_PREFIX.len()..name.len() - BACKUP_SUFFIX.len()].bytes()
+            .all(|b| b.is_ascii_digit() || b == b'-')
+}
+
+fn inspect_backup(path: &Path) -> Result<(), String> {
+    if !std::fs::symlink_metadata(path).map_err(|e| e.to_string())?.file_type().is_file() {
+        return Err("agentMemoryUnsafeBackupFile".into());
+    }
+    let source = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| e.to_string())?;
+    let check: String = source.query_row("PRAGMA quick_check", [], |row| row.get(0))
+        .map_err(|e| e.to_string())?;
+    if check != "ok" { return Err("agentMemoryBackupCorrupt".into()); }
+    let _: i64 = source.query_row("SELECT count(*) FROM agent_memories", [], |r| r.get(0))
+        .map_err(|_| "agentMemoryBackupIncompatible".to_string())?;
+    Ok(())
+}
+
+fn backup_snapshot(con: &Connection, dir: &Path) -> Result<AgentMemoryBackup, String> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?;
+    let name = format!("{BACKUP_PREFIX}{}-{:09}{BACKUP_SUFFIX}", now.as_secs(), now.subsec_nanos());
+    let path = dir.join(&name);
+    // Reserve the filename with create_new: never overwrite a prior snapshot or follow a symlink.
+    let reserved = std::fs::OpenOptions::new().write(true).create_new(true)
+        .open(&path).map_err(|e| e.to_string())?;
+    drop(reserved);
+    // VACUUM INTO creates a transactionally consistent standalone DB (including WAL changes).
+    // It fails safely if the destination is already occupied; the live DB is not changed.
+    if let Err(error) = con.execute("VACUUM main INTO ?1", params![path.to_string_lossy().as_ref()]) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error.to_string());
+    }
+    if let Err(error) = inspect_backup(&path) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error);
+    }
+    Ok(AgentMemoryBackup { name, bytes: std::fs::metadata(path).map_err(|e| e.to_string())?.len() })
+}
+
+fn list_backups(dir: &Path) -> Result<Vec<AgentMemoryBackup>, String> {
+    let mut items = Vec::new();
+    for entry in std::fs::read_dir(dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !backup_name_is_safe(&name) { continue; }
+        let metadata = std::fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
+        if metadata.file_type().is_file() { items.push(AgentMemoryBackup { name, bytes: metadata.len() }); }
+    }
+    items.sort_by(|a, b| b.name.cmp(&a.name));
+    items.truncate(100); // bounded UI list; does not delete user backups.
+    Ok(items)
+}
+
+#[tauri::command]
+pub async fn agent_memory_backup(app: AppHandle) -> Result<AgentMemoryBackup, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let con = connection(&app)?;
+        backup_snapshot(&con, &backups_dir(&app)?)
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn agent_memory_backups(app: AppHandle) -> Result<Vec<AgentMemoryBackup>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_backups(&backups_dir(&app)?))
+        .await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn agent_memory_diagnostic(app: AppHandle) -> Result<AgentMemoryDiagnostic, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let con = connection(&app)?;
+        let check: String = con.query_row("PRAGMA quick_check", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        let items: i64 = con.query_row("SELECT count(*) FROM agent_memories", [], |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        let backups = list_backups(&backups_dir(&app)?)?.len();
+        Ok(AgentMemoryDiagnostic { healthy: check == "ok", items, backups })
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn agent_memory_restore(app: AppHandle, name: String) -> Result<usize, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if !backup_name_is_safe(&name) { return Err("agentMemoryUnsafeBackupName".into()); }
+        let dir = backups_dir(&app)?;
+        let target = dir.join(&name); // only a validated basename, never an arbitrary user path
+        inspect_backup(&target)?;
+        let source = Connection::open_with_flags(&target, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| e.to_string())?;
+        let mut con = connection(&app)?;
+        // A separate, verified rollback snapshot is ALWAYS created before destructive work.
+        backup_snapshot(&con, &dir)?;
+        let tx = con.transaction().map_err(|e| e.to_string())?;
+        tx.execute("DELETE FROM agent_memories", []).map_err(|e| e.to_string())?;
+        let mut count = 0usize;
+        {
+            let mut read = source.prepare(
+                "SELECT id,commander,faction,category,text,event_key,created_at FROM agent_memories ORDER BY id")
+                .map_err(|e| e.to_string())?;
+            let mut insert = tx.prepare(
+                "INSERT INTO agent_memories (id,commander,faction,category,text,event_key,created_at) VALUES (?1,?2,?3,?4,?5,?6,?7)")
+                .map_err(|e| e.to_string())?;
+            let mut rows = read.query([]).map_err(|e| e.to_string())?;
+            while let Some(row) = rows.next().map_err(|e| e.to_string())? {
+                insert.execute(params![
+                    row.get::<_,i64>(0).map_err(|e| e.to_string())?,
+                    row.get::<_,String>(1).map_err(|e| e.to_string())?,
+                    row.get::<_,String>(2).map_err(|e| e.to_string())?,
+                    row.get::<_,String>(3).map_err(|e| e.to_string())?,
+                    row.get::<_,String>(4).map_err(|e| e.to_string())?,
+                    row.get::<_,Option<String>>(5).map_err(|e| e.to_string())?,
+                    row.get::<_,String>(6).map_err(|e| e.to_string())?,
+                ]).map_err(|e| e.to_string())?;
+                count += 1;
+            }
+        }
+        // Any failure before commit rolls back everything: live DB cannot be half-restored.
+        tx.commit().map_err(|e| e.to_string())?;
+        Ok(count)
+    }).await.map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn safe_snapshot_names() {
+        assert!(backup_name_is_safe("edch-agent-memory-backup-1234567890-123456789.sqlite3"));
+        assert!(!backup_name_is_safe("../edch-agent-memory-backup-1.sqlite3"));
+        assert!(!backup_name_is_safe("edch-agent-memory-backup-1.sqlite3/../../other"));
+    }
     #[test]
     fn scope_validation() {
         assert_eq!(name(" CMDR A ").unwrap(), "cmdr a");

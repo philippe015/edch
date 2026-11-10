@@ -2,6 +2,8 @@
   "about": {
     "aboutEdch": "Acerca de EDCH",
     "author": "El autor",
+    "communityContributorTitle": "Contribución al desarrollo comunitario",
+    "communityContributorDescription": "ha participado en el desarrollo y la programación de las extensiones comunitarias no oficiales EDCH BGS / Manjaro, incluido el seguimiento BGS, las patrullas, las etiquetas de controles en francés y las correcciones de estabilidad.",
     "bugsAreReportedGithubDebugLog": "Los errores se informan en GitHub, con el registro debug: es lo que permite entender qué pasó.",
     "buildExportFormatImportedIntoWishlist": "Formato de exportación de builds importado a la lista de deseos",
     "buildExportFormatImportedIntoWishlist2": "Formato de exportación de builds importado a la lista de deseos, y los datos de los motores de distorsión para la ruta exacta (coriolis-data)",

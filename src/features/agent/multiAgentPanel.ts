@@ -1,21 +1,25 @@
 /** EDCH-COG-MULTI-v1.6.0 — read-only local audit display. */
 import { h } from "../../ui/dom.js";
-import { requestMultiAgentDiagnostic } from "./runtime.js";
+import { agentDiagnosticSummary, agentWorkerHealth, requestMultiAgentDiagnostic } from "./runtime.js";
 
 interface AuditCounts { observed: number; proposed: number; verified: number; rejected: number }
 const totals: AuditCounts = { observed: 0, proposed: 0, verified: 0, rejected: 0 };
 let panel: HTMLElement | null = null;
 let listenersReady = false;
-let workerVerified = false;
+// The runtime owns Worker state; a previous positive diagnostic must never be cached here.
 let lastAt = "";
 
 function render(): void {
   if (!panel?.isConnected) return;
   const status = panel.querySelector<HTMLElement>("#edch-cog-v160-status");
   const counters = panel.querySelector<HTMLElement>("#edch-cog-v160-stats");
-  if (status) status.textContent = workerVerified
-    ? "Worker v1.6.0 confirmé · trois agents locaux opérationnels"
-    : "Worker non confirmé : active l'agent puis clique sur « Tester le Worker »";
+  const state = agentWorkerHealth();
+  if (status) status.textContent = state.phase === "ready"
+    ? "Worker vérifié · trois rôles locaux prêts"
+    : state.phase === "paused" ? "Traitement suspendu : consulte le diagnostic et relance manuellement"
+    : state.phase === "retry" ? "Worker en reprise automatique (diagnostic précédent invalidé)"
+    : state.phase === "starting" ? "Worker démarré, diagnostic de coordination non confirmé"
+    : "Worker arrêté · aucun rôle opérationnel";
   if (counters) counters.textContent =
     `Observés : ${totals.observed} · Proposés : ${totals.proposed} · Vérifiés : ${totals.verified}` +
     ` · Refusés : ${totals.rejected}${lastAt ? ` · Dernier traitement : ${lastAt}` : ""}`;
@@ -41,12 +45,8 @@ function listeners(): void {
     lastAt = new Date().toLocaleTimeString("fr-FR");
     render();
   });
-  window.addEventListener("edch-cog-capabilities", (event: Event) => {
-    const data = (event as CustomEvent<unknown>).detail as Record<string, unknown> | null;
-    if (data?.version === "1.6.0" && Array.isArray(data.agents) &&
-        data.agents.join(",") === "observateur,analyste,verificateur") workerVerified = true;
-    render();
-  });
+  window.addEventListener("edch-cog-worker-state", render);
+  window.addEventListener("edch-cog-capabilities", render);
 }
 
 /** Mount inside the existing Agent COG tab, without attaching any journal reader. */
@@ -64,6 +64,13 @@ export function mountMultiAgentPanel(): HTMLElement {
         }
       } }, "Tester la coordination"),
     ),
+    h("div.bgs-actions", null,
+      h("button", { type: "button", onclick: () => {
+        const report = panel?.querySelector<HTMLElement>("#edch-cog-v161-diagnostic");
+        if (report) report.textContent = agentDiagnosticSummary();
+      } }, "Diagnostic local"),
+    ),
+    h("pre#edch-cog-v161-diagnostic.sub", { role: "status" }, "Diagnostic à la demande : aucun secret collecté."),
     h("p#edch-cog-v160-status.sub", { role: "status" }, "Vérification du Worker en attente"),
     h("p#edch-cog-v160-stats.sub", null, "Aucun événement traité depuis l'ouverture de l'application."),
     h("p.sub", null,

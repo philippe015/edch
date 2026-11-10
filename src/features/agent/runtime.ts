@@ -19,6 +19,26 @@ import {
 
 const ENABLE_KEY = "edch.bgs.agent.journal.v1";
 const WORKER_TIMEOUT_MS = 10000;
+const MAX_AUTO_RETRIES = 5; // after this, keep the durable queue and require explicit user retry
+export type AgentWorkerPhase = "stopped" | "starting" | "ready" | "retry" | "paused";
+export interface AgentWorkerHealth {
+  phase: AgentWorkerPhase;
+  generation: number;
+  retries: number;
+  lastError: string;
+}
+let phase: AgentWorkerPhase = "stopped";
+let retryPaused = false;
+let lastError = "";
+export function agentWorkerHealth(): AgentWorkerHealth {
+  return { phase, generation, retries, lastError };
+}
+function setWorkerPhase(next: AgentWorkerPhase): void {
+  phase = next;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("edch-cog-worker-state", { detail: agentWorkerHealth() }));
+  }
+}
 let worker: Worker | null = null;
 let generation = 0;
 let queuePromise: Promise<AgentQueue> | null = null;
@@ -74,7 +94,9 @@ export function agentEnabled(): boolean {
 export function agentStatus(): string {
   if (!agentEnabled()) return "Agent arrêté · file conservée";
   const mode = queueMode === "indexeddb" ? "file persistante" : queueMode === "volatile" ? "mémoire volatile (dégradée)" : "initialisation";
-  return `${worker ? "Agent actif" : "Agent en reprise"} · ${processed} événements · ${ignored} ignorés · ${counts.pending} en attente · ${mode} · ${last}`;
+  const status = phase === "ready" ? "Worker vérifié" : phase === "paused" ? "Reprise manuelle requise" :
+    phase === "retry" ? "Redémarrage programmé" : phase === "starting" ? "Worker en démarrage" : "Worker arrêté";
+  return `${status} · ${processed} événements · ${ignored} ignorés · ${counts.pending} en attente · ${mode} · ${last}`;
 }
 function report() {
   window.dispatchEvent(new Event("edch-agent-status"));
@@ -87,6 +109,9 @@ function queueReady(): Promise<AgentQueue> {
       if (queue.mode === "volatile") last = "Stockage persistant indisponible : file non récupérable après arrêt";
       scheduleStats();
       return queue;
+    }).catch((error: unknown) => {
+      queuePromise = null; // transient initialization failures must not poison all future retries
+      throw error;
     });
   }
   return queuePromise;
@@ -100,6 +125,7 @@ function stopWorker() {
     worker.terminate();
     worker = null;
   }
+  setWorkerPhase("stopped"); // invalidates any earlier successful diagnostic
 }
 function scheduleStats() {
   if (statsTimer !== undefined) return;
@@ -118,14 +144,23 @@ function failure(reason: string) {
   if (!agentEnabled()) return;
   log.warn("bgs-agent", reason);
   last = reason.slice(0, 180);
+  lastError = last;
   stopWorker();
   retries++;
   if (retryTimer !== undefined) window.clearTimeout(retryTimer);
-  const delay = Math.min(15000, 500 * 2 ** Math.min(retries - 1, 5));
-  retryTimer = window.setTimeout(() => {
-    retryTimer = undefined;
-    start();
-  }, delay);
+  retryTimer = undefined;
+  if (retries >= MAX_AUTO_RETRIES) {
+    retryPaused = true;
+    last = `Reprise automatique suspendue après ${retries} échecs : vérifier la file avant de relancer`;
+    setWorkerPhase("paused");
+  } else {
+    setWorkerPhase("retry");
+    const delay = Math.min(15000, 500 * 2 ** Math.min(retries - 1, 5));
+    retryTimer = window.setTimeout(() => {
+      retryTimer = undefined;
+      start();
+    }, delay);
+  }
   scheduleStats();
   report();
 }
@@ -138,17 +173,20 @@ async function deliverOutbox(q: AgentQueue): Promise<void> {
     for (let i = 0; i < 8 && agentEnabled(); i++) {
       const rows = await q.takeOutbox(AGENT_BATCH_LIMIT);
       if (!rows.length) break;
+      // Validate the ENTIRE batch before changing its durable state.
+      if (rows.some((row) => !verifyAction(row.action))) {
+        throw new Error("Action invalide dans la boîte de sortie : restauration manuelle nécessaire");
+      }
+      // Durable removal is committed before UI delivery: notifications are at-most-once
+      // across a crash (a crash in the very small commit-to-dispatch window may skip one).
+      // The source event and its processed receipt are still retained in the database.
+      await q.delivered(rows.map((row) => row.id));
       for (const row of rows) {
-        if (!verifyAction(row.action)) {
-          // A corrupt outbox is never used as an instruction; surface the failure.
-          throw new Error("Action invalide dans la boîte de sortie : restauration manuelle nécessaire");
-        }
         lastAction = row.action;
         last = row.action.text.slice(0, 100);
         window.dispatchEvent(new CustomEvent("edch-agent-action", { detail: row.action }));
         if (row.action.important) notify(row.action.text, { sound: false });
       }
-      await q.delivered(rows.map((row) => row.id));
     }
   } finally {
     outboxBusy = false;
@@ -255,9 +293,11 @@ async function receiveBatch(data: Record<string, unknown>, gen: number) {
 }
 
 function start() {
-  if (worker || !agentEnabled() || retryTimer !== undefined) return;
+  if (worker || !agentEnabled() || retryTimer !== undefined || retryPaused) return;
   if (typeof Worker === "undefined") {
     last = "Web Worker indisponible";
+    setWorkerPhase("paused");
+    retryPaused = true;
     report();
     return;
   }
@@ -265,6 +305,7 @@ function start() {
     const w = new Worker(new URL("./agentWorker.js", import.meta.url), { type: "module", name: "edch-bgs-agent" });
     worker = w;
     const gen = ++generation;
+    setWorkerPhase("starting");
     w.onmessage = (msg: MessageEvent<unknown>) => {
       if (gen !== generation) return;
       const data = msg.data as Record<string, unknown> | null;
@@ -276,9 +317,17 @@ function start() {
       }
       if (data?.type === "capabilities" && data.version === "1.6.0" &&
           Array.isArray(data.agents) && data.agents.join(",") === "observateur,analyste,verificateur") {
+        setWorkerPhase("ready");
         window.dispatchEvent(new CustomEvent("edch-cog-capabilities", {
-          detail: { version: "1.6.0", agents: data.agents.slice() },
+          detail: { version: "1.6.0", agents: data.agents.slice(), generation: gen },
         }));
+        return;
+      }
+      if (data?.type === "batch-error" && pendingBatch?.gen === gen &&
+          pendingBatch.id === data.batchId) {
+        // The Worker rejected a malformed batch immediately, rather than timing out.
+        const reason = data.reason === "invalid-event" ? "événement invalide" : "lot incorrect";
+        failure(`Worker : ${reason} (accusé de refus immédiat)`);
         return;
       }
       if (data?.type === "batch-result") void receiveBatch(data, gen);
@@ -306,6 +355,8 @@ export function setAgentEnabled(on: boolean): boolean {
     return false;
   }
   if (!on) {
+    retryPaused = false;
+    retries = 0;
     if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     retryTimer = undefined;
     stopWorker();
@@ -363,6 +414,9 @@ export function requestMultiAgentDiagnostic(): boolean {
 /** Optional manual retry after a transient storage or Worker problem. */
 export function retryAgentQueue(): void {
   if (!agentEnabled()) return;
+  retryPaused = false;
+  retries = 0;
+  lastError = "";
   if (retryTimer !== undefined) window.clearTimeout(retryTimer);
   retryTimer = undefined;
   stopWorker();
@@ -389,4 +443,16 @@ export function agentEventDedupKey(event: AgentEvent): string {
 // Resume durable pending work on EDCH startup even if no NEW journal line arrives.
 if (typeof window !== "undefined" && agentEnabled()) {
   void Promise.resolve().then(() => start());
+}
+
+/** Read-only local state summary: no journal lines, usernames, notes or API secrets. */
+export function agentDiagnosticSummary(): string {
+  const h = agentQueueHealth();
+  const w = agentWorkerHealth();
+  return [
+    `Worker : ${w.phase} (génération ${w.generation}, échecs ${w.retries})`,
+    `File : ${h.mode}, en attente ${h.pending}, sortie ${h.outbox}, traités ${h.processed}`,
+    `Ignorés : ${h.ignored}, doublons filtrés : ${h.duplicate}, dépassements : ${h.overflow}`,
+    `Dernière erreur : ${w.lastError || "aucune"}`,
+  ].join("\n");
 }

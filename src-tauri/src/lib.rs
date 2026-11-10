@@ -61,6 +61,11 @@ pub fn run() {
             agent_memory::agent_memory_add,
             agent_memory::agent_memory_list,
             agent_memory::agent_memory_delete,
+            // EDCH-COG-STABILISATION-v1.6.1
+            agent_memory::agent_memory_backup,
+            agent_memory::agent_memory_backups,
+            agent_memory::agent_memory_diagnostic,
+            agent_memory::agent_memory_restore,
             bgs_db::bgs_save,
             bgs_db::bgs_visit,
             bgs_db::bgs_health,

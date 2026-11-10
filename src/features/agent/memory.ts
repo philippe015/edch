@@ -45,3 +45,23 @@ export function memoryDelete(scope: MemoryScope, id: number): Promise<boolean> {
   if (!validMemoryScope(scope) || !Number.isSafeInteger(id) || id <= 0) return Promise.reject(new Error("Suppression refusée"));
   return invoke<boolean>("agent_memory_delete", { ...scope, id });
 }
+
+// EDCH-COG-STABILISATION-v1.6.1: snapshots of the entire local agent-memory database.
+// Returned paths are safe basenames only. The Rust backend controls the directory.
+export interface AgentMemoryBackup { name: string; bytes: number }
+export interface AgentMemoryDiagnostic { healthy: boolean; items: number; backups: number }
+export function memoryBackup(): Promise<AgentMemoryBackup> {
+  return invoke<AgentMemoryBackup>("agent_memory_backup", {});
+}
+export function memoryBackups(): Promise<AgentMemoryBackup[]> {
+  return invoke<AgentMemoryBackup[]>("agent_memory_backups", {});
+}
+export function memoryRestore(name: string): Promise<number> {
+  if (!/^edch-agent-memory-backup-[0-9-]+\.sqlite3$/.test(name)) {
+    return Promise.reject(new Error("Nom de sauvegarde non valide"));
+  }
+  return invoke<number>("agent_memory_restore", { name });
+}
+export function memoryDiagnostic(): Promise<AgentMemoryDiagnostic> {
+  return invoke<AgentMemoryDiagnostic>("agent_memory_diagnostic", {});
+}

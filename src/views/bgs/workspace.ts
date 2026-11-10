@@ -18,7 +18,7 @@ import { mountBgsAlertPanel } from "../../features/bgs/alertPanel.js"; // EDCH-B
 import { mountMultiAgentPanel } from "../../features/agent/multiAgentPanel.js"; // EDCH-COG-MULTI-v1.6.0
 import type { BgsState } from "../../features/bgs/core.js";
 import { h } from "../../ui/dom.js";
-import { checkedMemoryAction, memoryAdd, memoryDelete, memoryList, validMemoryScope, type MemoryScope } from "../../features/agent/memory.js"; // EDCH-COG-MEMORY-v1.5.3
+import { checkedMemoryAction, memoryAdd, memoryDelete, memoryList, validMemoryScope, memoryBackup, memoryBackups, memoryRestore, memoryDiagnostic, type MemoryScope } from "../../features/agent/memory.js"; // EDCH-COG-MEMORY-v1.6.1
 
 type Tab = "systems" | "patrols" | "influence" | "agent";
 const TABS: { id: Tab; label: string }[] = [
@@ -238,7 +238,7 @@ function makeAgentConsole(existingButton: HTMLElement | null, existingStatus: HT
       h(
         "p.sub",
         null,
-        "Les événements reconnus sont conservés localement avant traitement. En cas de redémarrage, la file IndexedDB reprend. Les notifications peuvent se répéter si l'application ferme pendant leur affichage. Aucun appel IA ni commande système.",
+        "La file IndexedDB conserve les événements non acquittés. Les notifications sont retirées de la boîte de sortie avant affichage pour éviter les doublons ; en cas de fermeture pendant cet intervalle, une notification peut être manquée. Les reçus restent enregistrés. Aucun appel IA ni commande système.",
       ),
     ),
     h("section.card.bgs-panel.edch-cog-memory", null,
@@ -260,6 +260,44 @@ function makeAgentConsole(existingButton: HTMLElement | null, existingStatus: HT
         } }, "Enregistrer une note"),
         h("button", { type: "button", onclick: refreshMemories }, "Actualiser la mémoire"),
       ),
+      h("div.bgs-actions", null,
+        h("button", { type: "button", onclick: () => {
+          if (memoryBusy) return;
+          memoryBusy = true;
+          const info = host?.querySelector<HTMLElement>("#edch-cog-backup-status");
+          if (info) info.textContent = "Création de la sauvegarde SQLite cohérente…";
+          void memoryBackup().then((saved) => {
+            if (info) info.textContent = `Sauvegarde locale créée : ${saved.name} (${saved.bytes} octets).`;
+          }).catch((error: unknown) => {
+            if (info) info.textContent = `Sauvegarde impossible : ${String(error)}`;
+          }).finally(() => { memoryBusy = false; });
+        } }, "Sauvegarder SQLite"),
+        h("button", { type: "button", onclick: () => {
+          const selector = host?.querySelector<HTMLSelectElement>("#edch-cog-backups");
+          const info = host?.querySelector<HTMLElement>("#edch-cog-backup-status");
+          void Promise.all([memoryBackups(), memoryDiagnostic()]).then(([items, diagnostic]) => {
+            selector?.replaceChildren(...items.map((item) => h("option", { value: item.name }, `${item.name} (${item.bytes} octets)`)));
+            if (info) info.textContent = `SQLite : ${diagnostic.healthy ? "intègre" : "erreur"} · ${diagnostic.items} entrées · ${diagnostic.backups} sauvegarde(s).`;
+          }).catch((error: unknown) => {
+            if (info) info.textContent = `Diagnostic SQLite impossible : ${String(error)}`;
+          });
+        } }, "Diagnostic + sauvegardes"),
+        h("select#edch-cog-backups", { "aria-label": "Sauvegarde SQLite à restaurer" }),
+        h("button", { type: "button", onclick: () => {
+          const selector = host?.querySelector<HTMLSelectElement>("#edch-cog-backups");
+          const info = host?.querySelector<HTMLElement>("#edch-cog-backup-status");
+          if (!selector?.value || memoryBusy) return;
+          if (!window.confirm("Restaurer toute la mémoire des commandants et factions depuis cette sauvegarde ? Une sauvegarde actuelle sera d'abord créée automatiquement.")) return;
+          memoryBusy = true;
+          void memoryRestore(selector.value).then((count) => {
+            if (info) info.textContent = `Mémoire restaurée : ${count} entrée(s). Une copie d'avant restauration a été conservée.`;
+            refreshMemories();
+          }).catch((error: unknown) => {
+            if (info) info.textContent = `Restauration refusée : ${String(error)}`;
+          }).finally(() => { memoryBusy = false; });
+        } }, "Restaurer la mémoire…"),
+      ),
+      h("p#edch-cog-backup-status.sub", { role: "status" }, "Sauvegardes locales cohérentes avec le mode WAL, aucune donnée envoyée sur Internet."),
       h("div.bgs-table-scroll", null,
         h("table.bgs-table", null,
           h("thead", null, h("tr", null, ...["Date", "Type", "Contenu", "Action"].map((t) => h("th", null, t)))),

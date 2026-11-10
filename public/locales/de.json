@@ -2,6 +2,8 @@
   "about": {
     "aboutEdch": "Über EDCH",
     "author": "Der Autor",
+    "communityContributorTitle": "Beitrag zur Community-Entwicklung",
+    "communityContributorDescription": "hat an der Entwicklung und Programmierung der inoffiziellen EDCH-BGS-/Manjaro-Erweiterungen mitgewirkt, darunter BGS-Überwachung, Patrouillen, französische Steuerungsbezeichnungen und Stabilitätskorrekturen.",
     "bugsAreReportedGithubDebugLog": "Fehler werden auf GitHub gemeldet, mit dem Debug-Protokoll: Es zeigt, was passiert ist.",
     "buildExportFormatImportedIntoWishlist": "Build-Exportformat, das in die Wunschliste importiert wird",
     "buildExportFormatImportedIntoWishlist2": "Build-Exportformat für die Wunschliste und die Werte der Frameshiftantriebe für die exakte Route (coriolis-data)",

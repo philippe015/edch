@@ -15,6 +15,7 @@ type Inbound =
   | { type: "events"; events: AgentEvent[] }
   | { type: "reset" };
 type Outbound =
+  | { type: "batch-error"; batchId: number; reason: "invalid-size" | "invalid-event" }
   | {
       type: "batch-result";
       batchId: number;
@@ -71,14 +72,20 @@ scope.onmessage = (message) => {
     scope.postMessage({ type: "actions", actions, processed: legacyProcessed, dropped: legacyDropped });
     return;
   }
-  if (data?.type !== "batch" || !Number.isSafeInteger(data.batchId) || !Array.isArray(data.items)) return;
-  if (data.items.length === 0 || data.items.length > MAX_BATCH) return;
+  if (data?.type !== "batch" || !Number.isSafeInteger(data.batchId) || data.batchId <= 0) return;
+  if (!Array.isArray(data.items) || data.items.length === 0 || data.items.length > MAX_BATCH) {
+    scope.postMessage({ type: "batch-error", batchId: data.batchId, reason: "invalid-size" });
+    return;
+  }
   const results: { key: string; action: AgentAction | null }[] = [];
   let ignored = 0;
   const audits = [];
   for (const row of data.items) {
     const ev = safeEvent(row?.event);
-    if (!ev || typeof row.key !== "string" || row.key !== eventKey(ev)) return;
+    if (!ev || typeof row.key !== "string" || row.key !== eventKey(ev)) {
+      scope.postMessage({ type: "batch-error", batchId: data.batchId, reason: "invalid-event" });
+      return; // A bad batch is never partially acknowledged or dispatched.
+    }
     const decision = runMultiAgentPipeline(ev, row.key);
     audits.push(decision);
     if (!decision.action) ignored++;

@@ -119,7 +119,8 @@ test("v1.5.2 : le Worker ne produit que des actions vérifiées, aucun appel sys
     assert.ok(verifyAction(reply.results[0].action));
     const previous = calls.length;
     globalThis.self.onmessage({ data: { type: "batch", batchId: 2, items: [{ key: "wrong-key", event: input }] } });
-    assert.equal(calls.length, previous);
+    assert.equal(calls.length, previous + 1);
+    assert.deepEqual(calls.at(-1), { type: 'batch-error', batchId: 2, reason: 'invalid-event' });
   } finally {
     globalThis.self = selfPrevious;
   }
