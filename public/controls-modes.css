@@ -1,0 +1,15 @@
+/* EDCH v1.6.8 : isolated X52 three-mode planner styles; no global EDCH overrides. */
+.edch-x52-modes-v168{--x52line:#354455;--x52text:#c3d2e2;padding:16px;margin:16px 0;border:1px solid var(--x52line)}
+.edch-x52-modes-v168 h3{margin:2px 0 14px;font-size:17px;color:#e8edf4}
+.edch-x52-mode-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.edch-x52-mode-card{min-width:0;background:#151e29;border:1px solid #354455;border-radius:8px;padding:14px;color:#e8edf4}
+.edch-x52-mode-header{display:grid;gap:8px}
+.edch-x52-mode-number{font-size:12px;letter-spacing:.08em;color:#f6a34a;font-weight:700}
+.edch-x52-mode-card p{font-size:12px;line-height:1.5;color:var(--x52text)}
+.edch-x52-mode-actions,.edch-x52-mode-footer{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;align-items:center}
+.edch-x52-mode-details{margin-top:12px;font-size:12px}.edch-x52-mode-details summary{cursor:pointer;color:#fbb76e}
+.edch-x52-mode-rows{display:grid;gap:9px;margin-top:11px;max-height:240px;overflow:auto}
+.edch-x52-mode-row{display:grid;gap:3px;border-bottom:1px solid #334151;padding-bottom:7px}
+.edch-x52-mode-row code,.edch-x52-mode-row small{color:#afbdcd;font-size:11px;overflow-wrap:anywhere}
+.edch-x52-mode-message{color:#ffbf72;font-size:12px}
+@media(max-width:900px){.edch-x52-mode-grid{grid-template-columns:1fr}}
