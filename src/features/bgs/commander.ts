@@ -113,6 +113,16 @@ const namedFactions = (e: Record<string, unknown>): string[] => {
   if (Array.isArray(e.Factions)) for (const effect of e.Factions) if (object(effect)) items.push(effect.Faction);
   return [...new Set(items.map((x) => name(x, 160)).filter((x): x is string => !!x))].slice(0, 20);
 };
+/** Journal-confirmed paying factions only, never VictimFaction or presumed controlling factions. */
+export function journalAwardingFactions(e: Record<string, unknown>): string[] {
+  const items: unknown[] = [];
+  if (e.event === "FactionKillBond" || e.event === "CapShipBond") {
+    items.push(e.AwardingFaction);
+  } else if (e.event === "Bounty" && Array.isArray(e.Rewards)) {
+    for (const item of e.Rewards.slice(0, 100)) if (object(item)) items.push(item.Faction);
+  }
+  return [...new Set(items.map((x) => name(x, 160)).filter((x): x is string => !!x))].slice(0, 20);
+}
 /** Only live events should call this. We do not assign an inferred BGS gain to any entry. */
 export function classifyCommanderEvent(event: Record<string, unknown>): CommanderBgsEntry | null {
   const at = date(event.timestamp);
@@ -131,7 +141,13 @@ export function classifyCommanderEvent(event: Record<string, unknown>): Commande
   const kind = types[event.event];
   if (!kind) return null;
   const system = name(event.StarSystem, 180);
-  const factions = namedFactions(event);
+  // The original faction list remains part of the persisted key: changing the key
+  // would duplicate older activities when we replay journals to fill missing payees.
+  const legacyFactions = namedFactions(event);
+  const factions = [
+    ...legacyFactions,
+    ...journalAwardingFactions(event).filter((f) => !legacyFactions.some((old) => same(old, f))),
+  ].slice(0, 20);
   const credits = amount(event.Reward ?? event.Amount ?? event.TotalReward ?? event.TotalSale);
   const missionId =
     typeof event.MissionID === "number" && Number.isSafeInteger(event.MissionID) ? String(event.MissionID) : "";
@@ -141,7 +157,7 @@ export function classifyCommanderEvent(event: Record<string, unknown>): Commande
     missionId,
     system ?? "",
     credits ?? "",
-    factions.join("|"),
+    legacyFactions.join("|"),
     name(event.Target, 80) ?? "",
   ].join(";");
   return { at, kind, system, factions, amount: credits, key };
@@ -167,6 +183,15 @@ export function recordCommanderEvents(
       if (!saved.system && evidence.system) {
         saved.system = evidence.system;
         saved.systemSource = evidence.source;
+        changed++;
+      }
+      // Historical replay may enrich a matching stored row with explicit journal
+      // payees. Keep timestamp, amount, key and existing named factions unchanged.
+      const additional = row.factions.filter(
+        (f) => !saved.factions.some((existing) => same(existing, f)),
+      ).slice(0, Math.max(0, 20 - saved.factions.length));
+      if (additional.length) {
+        saved.factions.push(...additional);
         changed++;
       }
       continue;
