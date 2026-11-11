@@ -1,10 +1,15 @@
 /** EDCH-BGS-v1.4.1: personal, LOCAL journal activity. Not a BGS influence estimator. */
+import { JournalSystemTracker, type SystemEvidenceSource } from "./journalSystem.js";
+const journalSystems = new JournalSystemTracker();
+/** Reset the system timeline when a full journal replay begins. */
+export function resetCommanderJournalContext(): void { journalSystems.reset(); }
 export type CommanderEventKind =
   "jump" | "mission" | "mission-accepted" | "voucher" | "kill-bond" | "trade" | "bounty" | "exploration";
 export interface CommanderBgsEntry {
   at: string;
   kind: CommanderEventKind;
   system?: string;
+  systemSource?: SystemEvidenceSource;
   factions: string[]; // Explicitly named by the journal; no inferred beneficiaries.
   amount?: number; // Credits, not BGS influence points.
   key: string;
@@ -72,6 +77,7 @@ export function readCommanderLog(commander: string): CommanderBgsLog {
         kind: item.kind as CommanderEventKind,
         key: item.key as string,
         system: name(item.system, 180),
+        systemSource: item.systemSource === "journal" || item.systemSource === "context" ? item.systemSource : undefined,
         factions: Array.isArray(item.factions)
           ? [...new Set(item.factions.map((x) => name(x, 160)).filter((x): x is string => !!x))].slice(0, 20)
           : [],
@@ -140,21 +146,40 @@ export function classifyCommanderEvent(event: Record<string, unknown>): Commande
   ].join(";");
   return { at, kind, system, factions, amount: credits, key };
 }
-/** Idempotent and bounded, with no cross-commander merging. */
-export function recordCommanderEvents(commander: string, events: readonly Record<string, unknown>[]): number {
+/** Only recorded events can add activities. Replays may repair locations of matching saved rows. */
+export function recordCommanderEvents(
+  commander: string,
+  events: readonly Record<string, unknown>[],
+  replay = false,
+): number {
   if (!commanderKey(commander)) return 0;
   const profile = readCommanderLog(commander);
-  const seen = new Set(profile.entries.map((x) => x.key));
-  let added = 0;
-  for (const e of events) {
-    const row = classifyCommanderEvent(e);
-    if (!row || seen.has(row.key)) continue;
-    seen.add(row.key);
+  const known = new Map(profile.entries.map((entry) => [entry.key, entry]));
+  let changed = 0;
+  for (const event of events) {
+    // Ordered location events are consumed even though they are not BGS activities.
+    const evidence = journalSystems.consume(event, commander);
+    if (!evidence.accepted) continue;
+    const row = classifyCommanderEvent(event);
+    if (!row) continue;
+    const saved = known.get(row.key);
+    if (saved) {
+      if (!saved.system && evidence.system) {
+        saved.system = evidence.system;
+        saved.systemSource = evidence.source;
+        changed++;
+      }
+      continue;
+    }
+    if (replay) continue;
+    if (!row.system && evidence.system) row.system = evidence.system;
+    if (row.system) row.systemSource = evidence.source ?? "journal";
+    known.set(row.key, row);
     profile.entries.push(row);
-    added++;
+    changed++;
   }
-  if (added && !saveCommanderLog({ ...profile, entries: profile.entries.slice(-CMD_BGS_LIMIT) })) return 0;
-  return added;
+  if (changed && !saveCommanderLog({ ...profile, entries: profile.entries.slice(-CMD_BGS_LIMIT) })) return 0;
+  return changed;
 }
 export function setCommanderFaction(commander: string, faction: string): boolean {
   if (!commanderKey(commander) || !name(faction, 160)) return false;

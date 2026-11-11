@@ -742,7 +742,12 @@ export class BgsView implements View {
                       null,
                       h("td", null, displayDate(e.at)),
                       h("td", null, kindLabels[e.kind] ?? e.kind),
-                      h("td", null, e.system ?? "non indiqué"),
+                      h("td", { title: e.system
+                         ? e.systemSource === "context"
+                           ? "Système retrouvé grâce à une localisation datée du journal du jeu."
+                           : "Système indiqué par le journal du jeu."
+                         : "Aucune localisation fiable dans le journal pour cette activité." },
+                       e.system ? (e.kind === "voucher" ? `${e.system} (encaissement)` : e.system) : "non indiqué"),
                       h("td", null, e.factions.join(" / ") || "non attribuée"),
                       h("td", null, e.amount === undefined ? "—" : e.amount.toLocaleString("fr-FR")),
                     ),
