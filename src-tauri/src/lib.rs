@@ -25,6 +25,7 @@ mod ntfy;
 mod options;
 mod foot_binds; // EDCH-ONFOOT-EDIT-v1.4.4
 mod controls_preset; // EDCH-COMMANDES-JEU-v1.6.5
+mod hotas; // EDCH-HOTAS-STUDIO-v1.6.7
 mod report_html; // EDCH-REPORTS-HTML-v1.6.5
 mod paths;
 mod remote;
@@ -87,6 +88,8 @@ pub fn run() {
             foot_binds::foot_save_preset,
             controls_preset::controls_save_preset,
             controls_preset::controls_save_preset_batch,
+            hotas::hotas_devices,
+            hotas::hotas_capture,
             report_html::save_html_report,
             system::reveal_path,
             system::installer_language,

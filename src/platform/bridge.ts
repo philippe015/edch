@@ -315,6 +315,12 @@ export const controlsSavePreset = (sourceFile: string, change: ControlsPresetCha
 /** v1.6.6: checked multi-change generation, never modifying the original file. */
 export const controlsSavePresetBatch = (sourceFile: string, changes: ControlsPresetChange[]): Promise<ControlsPresetResult> =>
   invoke<ControlsPresetResult>("controls_save_preset_batch", { sourceFile, changes });
+/** v1.6.7: optional Linux joystick inspection. Raw indexes are NOT game .binds IDs. */
+export interface HotasDevice { id: string; name: string; vendor?: string | null; product?: string | null; readable: boolean; }
+export interface HotasEvent { deviceId: string; kind: "button" | "axis"; inputIndex: number; value: number; }
+export const hotasDevices = (): Promise<HotasDevice[]> => invoke<HotasDevice[]>("hotas_devices");
+export const hotasCapture = (deviceId: string, kind: "button" | "axis", timeoutMs: number): Promise<HotasEvent> =>
+  invoke<HotasEvent>("hotas_capture", { deviceId, kind, timeoutMs });
 /** Native HTML report persistence. Old PDF command is retained only for backwards compatibility. */
 export const saveHtmlReport = (kind: "bgs" | "commandes", html: string): Promise<string> =>
   invoke<string>("save_html_report", { kind, html });
