@@ -57,3 +57,27 @@
 @media(max-width:1100px){.edch-c166-layout{grid-template-columns:minmax(0,1fr)}.edch-c166-scroll{max-height:400px}}
 @media(max-width:660px){.edch-c166-heading{display:block;padding:13px}.edch-c166-hero-right{align-items:start;margin-top:14px}.edch-c166-layout{padding:8px;gap:8px}.edch-c166-pane{padding:9px}.edch-c166-table th,.edch-c166-table td{padding:7px 5px}}
 @media print{.edch-controls-write-v166{background:white;color:black}.edch-c166-btn,.edch-c166-tabs,.edch-c166-right{display:none!important}.edch-c166-scroll{overflow:visible;max-height:none}.edch-c166-table td,.edch-c166-table th{color:black;background:white}}
+
+/* EDCH v1.6.7 — HOTAS Studio. Schematic UI, not a verified physical button map. */
+.edch-hotas-v167{margin:0 0 14px;padding:16px;border:1px solid rgba(255,139,44,.34);border-radius:12px;background:linear-gradient(150deg,#151f2a,#10151c 60%,#18202c);color:#f4f6f9}
+.edch-hotas-heading{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:start}
+.edch-hotas-heading h3{margin:4px 0 10px;color:#ff943a;font-size:1.05rem}
+.edch-hotas-visuals{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:10px 0 14px}
+.edch-hotas-hardware{min-width:0;border:1px solid #344352;border-radius:10px;background:#131b23;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 8px}
+.edch-hotas-hardware strong{font-size:.86rem}.edch-hotas-hardware small{color:#9fb1c1;font-size:.73rem}
+.edch-hotas-stick,.edch-hotas-throttle{position:relative;width:110px;height:96px}
+.edch-hotas-stick-handle{position:absolute;left:47px;top:4px;width:22px;height:64px;border:2px solid #6da8ce;background:linear-gradient(#415b75,#1d2634);border-radius:13px 13px 6px 6px;transform:rotate(-12deg);transform-origin:bottom center}
+.edch-hotas-stick-handle:before{content:'';position:absolute;left:5px;top:9px;width:6px;height:7px;border-radius:50%;background:#ff8732;box-shadow:0 14px 0 #79bed6}
+.edch-hotas-stick-base{position:absolute;bottom:1px;left:10px;width:90px;height:27px;border-radius:50% 50% 10px 10px;background:linear-gradient(#445a71,#1a2530);border:1px solid #6da8ce}
+.edch-hotas-throttle-base{position:absolute;bottom:1px;left:16px;width:80px;height:48px;border-radius:15px;background:linear-gradient(#45576a,#18222f);border:1px solid #6da8ce}
+.edch-hotas-throttle-lever{position:absolute;left:42px;top:5px;width:29px;height:65px;transform:rotate(22deg);border:2px solid #89bdd7;border-radius:8px;background:linear-gradient(#3c556e,#171e29);z-index:1}
+.edch-hotas-throttle-lever:before{content:'';position:absolute;top:8px;left:8px;width:8px;height:8px;border-radius:50%;background:#ff8732}
+.edch-hotas-device{display:flex;flex-direction:column;gap:5px;margin:10px 0;color:#c2cedb}
+.edch-hotas-device select{min-width:0;max-width:100%;background:#1b2732;color:#fafafa;border:1px solid #45607a;border-radius:7px;padding:7px}
+.edch-hotas-capture{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.edch-hotas-capture button{border-color:#6b8192}
+.edch-hotas-message{color:#ffb96c;font-weight:500}
+.edch-hotas-result{border:1px solid #596b7b;border-radius:8px;padding:12px;margin-top:10px}
+.edch-hotas-candidate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px;border-bottom:1px solid #405161}
+.edch-hotas-candidate span{font-size:.85rem}
+@media(max-width:710px){.edch-hotas-visuals{grid-template-columns:1fr}.edch-hotas-v167{padding:12px}.edch-hotas-candidate{flex-direction:column;align-items:stretch}}

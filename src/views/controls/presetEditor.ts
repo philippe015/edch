@@ -9,6 +9,7 @@ import {
   recommendProfile, type ControlTab, type PresetAssignment, type SuggestedProfile,
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
+import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 
 interface SourceState { filename: string; actions: string[]; binds: Bind[] }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
@@ -43,6 +44,7 @@ export class ControlsPresetEditor {
   private replace=false;
   private staged:PresetAssignment[]=[];
   private acknowledgeWarnings=false;
+  private hotasStudio = new HotasStudio();
   private host?:HTMLElement;
   private context?:{meta:BindsMeta;files:OptionFile[];active:string;reload:()=>Promise<void>};
 
@@ -141,7 +143,14 @@ export class ControlsPresetEditor {
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
       h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer le profil ; sélectionne ensuite EDCHPro dans les préréglages du jeu (Général, Vaisseau, VRS et À pied selon la catégorie)."));
-    const right=h("div.edch-c166-right",null,editBox,adviceBox,draftBox);
+    const hotas = this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
+      const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
+      if (!input) return;
+      this.editInput = bindingKey(input);
+      this.message = `HOTAS : ${candidate.device} ${candidate.key} sélectionné. Choisis une commande, puis ajoute au brouillon.`;
+      this.repaint();
+    });
+    const right=h("div.edch-c166-right",null,hotas,editBox,adviceBox,draftBox);
     this.host=h("section.card.edch-controls-write-v166",null,heading,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       h("div.edch-c166-layout",null,rowPane,right),
