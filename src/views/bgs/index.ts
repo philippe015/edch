@@ -748,7 +748,14 @@ export class BgsView implements View {
                            : "Système indiqué par le journal du jeu."
                          : "Aucune localisation fiable dans le journal pour cette activité." },
                        e.system ? (e.kind === "voucher" ? `${e.system} (encaissement)` : e.system) : "non indiqué"),
-                      h("td", null, e.factions.join(" / ") || "non attribuée"),
+                      h("td", { title: e.kind === "kill-bond"
+                         ? "Faction attributrice AwardingFaction (journal Elite Dangerous), si fournie."
+                         : e.kind === "bounty"
+                           ? "Faction(s) payeuse(s) Rewards[].Faction, si fournies par le journal."
+                           : e.kind === "voucher"
+                             ? "Faction(s) du bon encaissé telle(s) que nommée(s) par le journal."
+                             : "Factions explicitement nommées dans le journal." },
+                         e.factions.join(" / ") || "non attribuée"),
                       h("td", null, e.amount === undefined ? "—" : e.amount.toLocaleString("fr-FR")),
                     ),
                   ),
