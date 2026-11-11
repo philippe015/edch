@@ -1,4 +1,4 @@
-/** EDCH BGS v1.6.2: pure, read-only alert presentation. No BGS writes or network access. */
+/** EDCH BGS v1.6.3: pure, read-only alert presentation. No BGS writes or network access. */
 import type { AlertKind, AlertSeverity, BgsAlert } from "./alertRules.js";
 
 export interface AlertQuery {
@@ -17,6 +17,25 @@ export interface AlertPage {
   from: number;
   to: number;
   total: number;
+}
+
+/** Exact priority breakdown of visible alerts, separate from recent trend variations. */
+export interface AlertPrioritySummary {
+  total: number;
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+export function summarizeAlertPriorities(alerts: readonly BgsAlert[]): AlertPrioritySummary {
+  const counts: AlertPrioritySummary = { total: 0, critical: 0, warning: 0, info: 0 };
+  for (const alert of alerts) {
+    if (alert.severity === "critical" || alert.severity === "warning" || alert.severity === "info") {
+      counts[alert.severity]++;
+      counts.total++;
+    }
+  }
+  return counts;
 }
 
 export const DEFAULT_ALERT_QUERY: Readonly<AlertQuery> = Object.freeze({

@@ -1197,7 +1197,7 @@ export class BgsView implements View {
           ["Systèmes", total],
           ["Contrôlés", controls],
           ["Données > 7 j / inconnues", stale],
-          ["Alertes à vérifier", alerts.length],
+          ["Variations récentes à vérifier", alerts.length],
           ["Influence en hausse", summary.rising],
           ["Influence en baisse", summary.falling],
         ].map(([label, value]) =>
