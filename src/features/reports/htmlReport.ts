@@ -2,7 +2,7 @@
  * Text is always escaped. No remote assets, scripts or active content.
  */
 import type { BgsState } from "../bgs/core.js";
-import { trendOf } from "../bgs/trends.js";
+import { trendOf, trendAlerts, trendsSummary } from "../bgs/trends.js";
 import type { ControlsPdfData } from "../controls/controlsPdf.js";
 
 export const escapeHtml = (raw: unknown): string => String(raw ?? "")
@@ -38,6 +38,10 @@ export function buildBgsReportHtml(state: BgsState, commander = ""): string {
   if (!state || !Array.isArray(state.systems) || !Array.isArray(state.history)) throw new Error("invalid BGS snapshot");
   const systems = state.systems.slice(0, MAX_ROWS);
   const controls = systems.filter(s => s && s.controls === true).length;
+  const present = systems.filter(s => s && s.controls === false).length;
+  const unverified = systems.length - controls - present;
+  const observed = trendsSummary(state);
+  const alerts = trendAlerts(state);
   const now = Date.now();
   const stale = systems.filter(s => !s || !s.updatedAt || !Number.isFinite(Date.parse(s.updatedAt)) || now-Date.parse(s.updatedAt)>7*86400000).length;
   const rows = systems.map((system) => {
@@ -48,8 +52,12 @@ export function buildBgsReportHtml(state: BgsState, commander = ""): string {
       `${cell(date(system.lastVisitedAt))}${cell((system.states || []).join(", "))}${cell((system.note || "").slice(0,500))}</tr>`;
   }).join("\n");
   const content = `<div class="metrics">${metric("Systèmes dans le relevé",state.systems.length)}${metric("Contrôlés (liste affichée)",controls)}${metric("Données de plus de 7 jours / inconnues (liste)",stale)}</div>
-  <div class="note">Observations Spansh : indicatives, pas une preuve de tick Elite Dangerous. Les variations correspondent uniquement aux relevés disponibles. Le profil du CMDR reste local.</div>
-  <h2>Faction et sources</h2><p><b>Faction suivie :</b> ${escapeHtml(state.faction)}<br><b>Commandant :</b> ${escapeHtml(commander || "Non indiqué")}<br><b>Dernière recherche :</b> ${escapeHtml(date(state.lastFetchedAt))}<br><b>Tick EDCD annoncé :</b> ${escapeHtml(date(state.tickAt))}${state.partial ? " · Recherche partielle" : ""}</p>
+  <div class="metrics">${metric("Présence sans contrôle",present)}${metric("Contrôle non vérifié",unverified)}${metric("Influence en hausse",observed.rising)}${metric("Influence en baisse",observed.falling)}${metric("Influence stable",observed.stable)}${metric("Sans comparaison",observed.unavailable)}${metric("Observations enregistrées",state.history.length)}${metric("Alertes récentes",alerts.length)}</div>
+  <div class="note">Observations Spansh : indicatives, pas une preuve de tick Elite Dangerous ni une preuve de l'influence d'un CMDR. Les variations correspondent uniquement aux relevés disponibles. Le profil du CMDR reste local.</div>
+  <h2>Faction et sources</h2><p><b>Faction suivie :</b> ${escapeHtml(state.faction)}<br><b>Commandant :</b> ${escapeHtml(commander || "Non indiqué")}<br><b>Dernière recherche :</b> ${escapeHtml(date(state.lastFetchedAt))}<br><b>Tick EDCD annoncé :</b> ${escapeHtml(date(state.tickAt))}<br><b>Couverture Spansh :</b> ${state.partial ? "Partielle" : "Selon les relevés disponibles"}<br><b>Systèmes annoncés :</b> ${escapeHtml(state.reportedTotal ?? "Inconnu")}</p>
+  <h2>Variations récentes à vérifier (${alerts.length})</h2>
+  ${alerts.length ? `<ul>${alerts.slice(0,500).map(a=>`<li><strong>${escapeHtml(a.system)}</strong> : ${escapeHtml(a.text)}</li>`).join("\n")}</ul>` : `<p>Aucune variation récente à vérifier.</p>`}
+  ${alerts.length>500 ? `<p class="small">${alerts.length-500} alerte(s) supplémentaires non détaillées.</p>` : ""}
   <h2>Relevés par système</h2><div class="scroll"><table><thead><tr><th>Système</th><th>Contrôle</th><th>Influence %</th><th>Variation pts</th><th>Source</th><th>Date relevé</th><th>Visité</th><th>États</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
   ${state.systems.length>MAX_ROWS ? `<p class="small">Rapport limité aux ${MAX_ROWS} premières lignes, sur ${state.systems.length} systèmes.</p>` : ""}`;
   return report("EDCH — Rapport BGS HTML",`Édité le ${new Date().toLocaleString("fr-FR")}`,content);
