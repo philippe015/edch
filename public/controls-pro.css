@@ -1,0 +1,59 @@
+/* EDCH v1.6.6: control-editor visual layer only. No impact on the rest of EDCH. */
+.edch-controls-write-v166{--edch-orange:#ff8d19;--edch-edge:#36424d;--edch-ink:#e3eaf0;color:var(--edch-ink);background:#101820;border:1px solid #2f404c;border-radius:10px;padding:0!important;overflow:hidden;margin-block:14px}
+.edch-c166-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:22px 22px 19px;background:linear-gradient(110deg,#171f28,#18202a 62%,#312416);border-bottom:2px solid #e47c13}
+.edch-c166-heading h3{margin:3px 0 6px;color:#f4f6f8;letter-spacing:.035em;font-size:1.3rem}
+.edch-c166-eyebrow{margin:0;font-size:.67rem;letter-spacing:.16em;color:#ff9e35;font-weight:800}
+.edch-c166-muted{color:#aab8c5;font-size:.83rem;line-height:1.45;margin:8px 0}
+.edch-c166-heading .edch-c166-muted{max-width:750px}
+.edch-c166-hero-right{display:flex;flex-direction:column;align-items:end;gap:8px;min-width:230px}
+.edch-c166-source{font-size:.78rem;color:#cdd8e1;display:grid;gap:5px;width:100%}
+.edch-c166-source select{width:100%}
+.edch-controls-write-v166 select,.edch-controls-write-v166 input[type=search]{background:#101923;color:#e5eff7;border:1px solid #425263;border-radius:4px;padding:8px 9px;max-width:100%;font:inherit;font-size:.83rem}
+.edch-controls-write-v166 select:focus-visible,.edch-controls-write-v166 input:focus-visible,.edch-controls-write-v166 button:focus-visible{outline:2px solid #ffa43b;outline-offset:2px}
+.edch-c166-chip{color:#ffc38b;font-size:.74rem;border:1px solid #9a5a2b;border-radius:3px;padding:4px 8px}
+.edch-c166-layout{display:grid;grid-template-columns:minmax(420px,1.6fr) minmax(310px,1fr);gap:13px;padding:15px}
+.edch-c166-pane{border:1px solid var(--edch-edge);border-radius:5px;background:#151f28;padding:15px;min-width:0}
+.edch-c166-list{align-self:start}
+.edch-c166-right{display:grid;gap:13px;align-content:start}
+.edch-c166-pane h4{margin:0 0 12px;color:#f4f6f8;font-size:1rem;font-weight:750;border-left:3px solid var(--edch-orange);padding-left:9px}
+.edch-c166-section-title{display:flex;align-items:center;justify-content:space-between;color:#94a5b6;font-size:.78rem}
+.edch-c166-section-title h4{margin-bottom:11px}
+.edch-c166-tabs{display:flex;flex-wrap:wrap;gap:3px;border-bottom:1px solid #45525c;margin:2px 0 12px}
+.edch-c166-tabs button{border:1px solid transparent;border-bottom:2px solid transparent;background:transparent;color:#bac6d1;padding:10px 9px;cursor:pointer;font-size:.8rem}
+.edch-c166-tabs button:hover{background:#263241;color:white}
+.edch-c166-tabs button.active{background:#3a2a1c;border-bottom-color:var(--edch-orange);color:#ffae4e;font-weight:750}
+.edch-c166-search{display:flex;align-items:center;gap:10px;color:#a8b7c5;font-size:.8rem;margin:12px 0}
+.edch-c166-search input{flex:1;min-width:110px}
+.edch-c166-scroll{max-height:550px;overflow:auto;border:1px solid #344450;border-radius:4px}
+.edch-c166-table{width:100%;border-collapse:collapse;font-size:.79rem}
+.edch-c166-table th{position:sticky;top:0;z-index:1;background:#26313e;color:#e3eaf2;font-weight:700;letter-spacing:.02em;text-align:left;padding:10px 8px;border-bottom:1px solid #536575}
+.edch-c166-table td{vertical-align:middle;padding:9px 8px;border-bottom:1px solid #2d3b47;color:#dce6f0}
+.edch-c166-table tbody tr:nth-child(even){background:#19242d}
+.edch-c166-table tbody tr:hover,.edch-c166-table .edch-c166-current{background:#2a3032}
+.edch-c166-table td strong{font-size:.83rem;display:block;color:#f4f6f8}
+.edch-c166-table td small{display:block;color:#8093a4;font-size:.66rem;overflow-wrap:anywhere;margin-top:3px}
+.edch-c166-bound{color:#cfdeeb;font-size:.75rem;overflow-wrap:anywhere}
+.edch-c166-unbound{color:#647b8b;font-style:italic}
+.edch-c166-btn{background:#233444;border:1px solid #4c6273;color:#e7eff6;cursor:pointer;padding:7px 9px;border-radius:3px;font:inherit;font-size:.78rem;min-height:30px}
+.edch-c166-btn:hover:not(:disabled){background:#33475b;color:white;border-color:#ff962f}
+.edch-c166-btn.primary{background:#af5e17;border-color:#f39635;color:#fff8f0;font-weight:700}
+.edch-c166-btn.primary:hover:not(:disabled){background:#d37318}
+.edch-c166-btn.selected{color:#ffa44b;border-color:#ff8d19}
+.edch-c166-btn:disabled{opacity:.4;cursor:default}
+.edch-c166-field{display:grid;gap:6px;color:#afc0ce;font-size:.78rem;margin:9px 0 13px}
+.edch-c166-field select{width:100%}
+.edch-c166-keyname{font-size:1rem;color:#fff;font-weight:750;margin:9px 0 5px}
+.edch-c166-ack{display:flex;align-items:flex-start;gap:7px;color:#d4dbdf;font-size:.8rem;margin:10px 0 13px}
+.edch-c166-ack input{accent-color:#ef8d24;margin-top:2px}
+.edch-c166-draft{max-height:200px;overflow:auto;border:1px solid #3d4953;border-radius:4px}
+.edch-c166-draft-line{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:7px 8px;border-bottom:1px solid #33414d}
+.edch-c166-draft-line strong,.edch-c166-draft-line small{display:block;font-size:.76rem}
+.edch-c166-draft-line small{color:#b7c3cc;margin-top:3px}
+.edch-c166-warning{background:#372718;border:1px solid #b7792f;border-radius:4px;padding:10px;color:#ffcf9d;font-size:.78rem;margin:10px 0}
+.edch-c166-warning p{margin:6px 0}
+.edch-c166-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.edch-c166-status{border:1px solid #55738c;background:#1a303c;border-radius:4px;padding:9px;font-size:.8rem;overflow-wrap:anywhere}
+.edch-c166-credits{padding:10px 16px;margin:0;border-top:1px solid #344653;background:#141e27;color:#9babb8;font-size:.74rem}
+@media(max-width:1100px){.edch-c166-layout{grid-template-columns:minmax(0,1fr)}.edch-c166-scroll{max-height:400px}}
+@media(max-width:660px){.edch-c166-heading{display:block;padding:13px}.edch-c166-hero-right{align-items:start;margin-top:14px}.edch-c166-layout{padding:8px;gap:8px}.edch-c166-pane{padding:9px}.edch-c166-table th,.edch-c166-table td{padding:7px 5px}}
+@media print{.edch-controls-write-v166{background:white;color:black}.edch-c166-btn,.edch-c166-tabs,.edch-c166-right{display:none!important}.edch-c166-scroll{overflow:visible;max-height:none}.edch-c166-table td,.edch-c166-table th{color:black;background:white}}
