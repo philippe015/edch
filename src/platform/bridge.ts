@@ -300,6 +300,22 @@ export const footSavePreset = (
   sourceFile: string,
   changes: { action: string; slot: "primary" | "secondary"; key: string; modifiers: string[] }[],
 ): Promise<FootPresetResult> => invoke<FootPresetResult>("foot_save_preset", { sourceFile, changes });
+/** v1.6.5: creates a new .binds preset under Elite Dangerous Options/Bindings; never overwrites. */
+export interface ControlsPresetChange {
+  action: string;
+  slot: "primary" | "secondary";
+  device: string;
+  key: string;
+  modifiers: { device: string; key: string }[];
+  replaceExisting: boolean;
+}
+export interface ControlsPresetResult { preset: string; filename: string; path: string }
+export const controlsSavePreset = (sourceFile: string, change: ControlsPresetChange): Promise<ControlsPresetResult> =>
+  invoke<ControlsPresetResult>("controls_save_preset", { sourceFile, change });
+/** Native HTML report persistence. Old PDF command is retained only for backwards compatibility. */
+export const saveHtmlReport = (kind: "bgs" | "commandes", html: string): Promise<string> =>
+  invoke<string>("save_html_report", { kind, html });
+
 // EDCH-BGS-PDF-v1.4.3
 export const bgsSavePdf = (bytes: Uint8Array): Promise<string> =>
   invoke<string>("bgs_save_pdf", { data: Array.from(bytes) });

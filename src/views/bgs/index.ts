@@ -1,8 +1,8 @@
 // EDCH-BGS-v1.2: influence history, conservative route planner and report export
 // BGS & Patrols extension for EDCH 0.10.11. Only public Spansh/EDCD requests; private data stays local.
-import { bgsSaveJson, bgsSavePdf, isRemote, isTauri, spanshPost } from "../../platform/bridge.js";
+import { bgsSaveJson, saveHtmlReport, isRemote, isTauri, spanshPost } from "../../platform/bridge.js";
 import { diagnoseBgsReliability, verifyBgsSnapshot } from "../../features/bgs/reliability.js"; // EDCH-BGS-RELIABILITY-v1.4.9
-import { buildBgsReportPdf } from "../../features/bgs/reportPdf.js";
+import { buildBgsReportHtml } from "../../features/reports/htmlReport.js";
 import { currentTick, refreshTick, type TickResult } from "../../features/bgs/monitor.js";
 import { withVisits } from "../../features/bgs/utils.js";
 import {
@@ -444,7 +444,7 @@ export class BgsView implements View {
     try {
       this.message = diagnoseBgsReliability(this.state, this.ctx.store.state.cmdr.commander).message;
     } catch (e) {
-      this.message = `Diagnostic BGS/PDF : ${String((e as Error)?.message ?? e)}`;
+      this.message = `Diagnostic BGS : ${String((e as Error)?.message ?? e)}`;
     }
     this.render();
   }
@@ -462,30 +462,19 @@ export class BgsView implements View {
     const current = ref.coords ? { name: ref.system ?? ref.label, coords: ref.coords } : undefined;
     return planPatrolRoute(this.filtered(), current, { maxLegLy: this.routeMaxLy, maxStops: this.routeStops });
   }
-  // EDCH-BGS-PDF-v1.4.3: genuine PDF, saved by Rust on desktop (no WebKit blob download).
+  // EDCH-REPORTS-HTML-v1.6.5: native offline HTML saved to Documents/EDCH/rapports.
   private async exportReport() {
     try {
-      const bytes = buildBgsReportPdf(this.state, { commander: this.ctx.store.state.cmdr.commander });
+      const html = buildBgsReportHtml(this.state, this.ctx.store.state.cmdr.commander);
       if (isTauri() && !isRemote()) {
-        const path = await bgsSavePdf(bytes);
-        this.message = `Rapport PDF enregistré : ${path}`;
+        const path = await saveHtmlReport("bgs", html);
+        this.message = `Rapport HTML enregistré : ${path}`;
       } else {
-        // Browser / remote mode: ordinary download, without needing a Tauri backend.
-        const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
-        try {
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "EDCH-BGS-rapport.pdf";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          this.message = "Téléchargement PDF demandé au navigateur.";
-        } finally {
-          window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-        }
+        download("EDCH-BGS-rapport.html", html, "text/html;charset=utf-8");
+        this.message = "Téléchargement du rapport HTML demandé au navigateur.";
       }
     } catch (error) {
-      this.message = `Échec export PDF : ${String((error as Error)?.message ?? error)}`;
+      this.message = `Échec export HTML : ${String((error as Error)?.message ?? error)}`;
     }
     this.render();
   }
@@ -1142,7 +1131,7 @@ export class BgsView implements View {
       btn("Sauvegarde JSON", () => {
         void this.exportJson();
       }),
-      btn("Diagnostic BGS / PDF", () => this.diagnosticExport()),
+      btn("Diagnostic BGS", () => this.diagnosticExport()),
       h(
         "label.bgs-import",
         null,
@@ -1233,7 +1222,7 @@ export class BgsView implements View {
             ),
           ),
           btn("Exporter les variations CSV", () => this.exportTrends()),
-          btn("Télécharger le rapport PDF", () => {
+          btn("Enregistrer le rapport HTML", () => {
             void this.exportReport();
           }),
         ),

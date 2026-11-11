@@ -6,8 +6,8 @@ import {
   auditDevices, auditFrenchReferences, compareBindProfiles, comparisonCsv,
   essentialChecks, findInputOverlaps, type ProfileDifference,
 } from "../../features/controls/controlsPro.js";
-import { buildControlsPdf } from "../../features/controls/controlsPdf.js";
-import { readOptionFile, type OptionFile } from "../../platform/bridge.js";
+import { buildControlsReportHtml } from "../../features/reports/htmlReport.js";
+import { readOptionFile, saveHtmlReport, isTauri, isRemote, type OptionFile } from "../../platform/bridge.js";
 import { h } from "../../ui/dom.js";
 
 function download(bytes: BlobPart, type: string, filename: string): void {
@@ -32,6 +32,7 @@ export class ControlsProPanel {
   private comparison?: ProfileDifference[];
   private comparedProfiles?: [string, string];
   private error = "";
+  private savedMessage = "";
   private current?: { meta: BindsMeta; binds: Bind[]; files: OptionFile[]; label: string };
   private host?: HTMLElement;
 
@@ -109,17 +110,28 @@ export class ControlsProPanel {
       ) : null,
     );
     const report = h("div.row", null,
-      button("Télécharger le diagnostic PDF", () => {
-        try {
-          const pdf=buildControlsPdf({devices:audit,overlaps:overlap,essentials,translations:translation,preset:label});
-          download(new Uint8Array(pdf), "application/pdf", "EDCH-Commandes-PRO-diagnostic-v164.pdf");
-        } catch (e) { this.error=String(e); this.repaint(); }
+      button("Enregistrer le diagnostic HTML", () => {
+        void (async () => {
+          try {
+            const html = buildControlsReportHtml({devices:audit,overlaps:overlap,essentials,translations:translation,preset:label});
+            if (isTauri() && !isRemote()) {
+              const path = await saveHtmlReport("commandes", html);
+              this.savedMessage = `Rapport HTML enregistré : ${path}`;
+            } else {
+              download(html,"text/html;charset=utf-8","EDCH-Commandes-PRO-diagnostic-v165.html");
+              this.savedMessage = "Téléchargement HTML demandé au navigateur.";
+            }
+            this.error = "";
+          } catch (e) { this.savedMessage = `Erreur export HTML : ${String(e)}`; }
+          this.repaint();
+        })();
       }),
     );
     this.host = h("section.card.controls-pro-v164", null,
       h("h3", null, "Commandes PRO · v1.6.4"),
-      h("p.sub", null, "Audit local, comparaison de profils et rapport PDF. Original EDCH : CMDR MDLuffy · contribution : Cyberpunk Philou."),
+      h("p.sub", null, "Audit local, comparaison de profils et rapport HTML. Original EDCH : CMDR MDLuffy · contribution : Cyberpunk Philou."),
       summary, diagnostics, compare, report,
+      this.savedMessage ? h("p.sub", { role: "status" }, this.savedMessage) : null,
     );
     return this.host;
   }

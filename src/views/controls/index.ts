@@ -42,6 +42,7 @@ import { board, gamepad, GROUP_LABELS, groupClass, legendTable } from "./deviceB
 import { keyboard } from "./keyboard.js";
 import { OnFootEditor } from "./footEditor.js"; // EDCH-ONFOOT-EDIT-v1.4.4
 import { ControlsProPanel } from "./proPanel.js"; // EDCH-COMMANDES-PRO-v1.6.4
+import { ControlsPresetEditor } from "./presetEditor.js"; // EDCH-COMMANDES-JEU-v1.6.5
 
 const MODES: [string, string, string[] | null][] = [
   ["all", t("controls.all"), null],
@@ -82,6 +83,7 @@ export class ControlsView implements View {
   private backupOut = h("div.backup-out");
   private onFootEditor = new OnFootEditor();
   private commandesPro = new ControlsProPanel();
+  private presetEditor = new ControlsPresetEditor();
 
   constructor(private ctx: Ctx) {}
 
@@ -342,6 +344,7 @@ export class ControlsView implements View {
       ),
       this.note ? h("p.notice", null, icon("warn"), ` ${this.note}`) : null,
       this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
+      this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings()),
       // EDCH-ONFOOT-EDIT-v1.4.4: edit and save a separate Odyssey keyboard-only preset.
       this.mode === "foot"
         ? this.onFootEditor.render(
