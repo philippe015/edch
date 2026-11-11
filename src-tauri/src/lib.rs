@@ -86,6 +86,7 @@ pub fn run() {
             options::import_config,
             foot_binds::foot_save_preset,
             controls_preset::controls_save_preset,
+            controls_preset::controls_save_preset_batch,
             report_html::save_html_report,
             system::reveal_path,
             system::installer_language,

@@ -312,6 +312,9 @@ export interface ControlsPresetChange {
 export interface ControlsPresetResult { preset: string; filename: string; path: string }
 export const controlsSavePreset = (sourceFile: string, change: ControlsPresetChange): Promise<ControlsPresetResult> =>
   invoke<ControlsPresetResult>("controls_save_preset", { sourceFile, change });
+/** v1.6.6: checked multi-change generation, never modifying the original file. */
+export const controlsSavePresetBatch = (sourceFile: string, changes: ControlsPresetChange[]): Promise<ControlsPresetResult> =>
+  invoke<ControlsPresetResult>("controls_save_preset_batch", { sourceFile, changes });
 /** Native HTML report persistence. Old PDF command is retained only for backwards compatibility. */
 export const saveHtmlReport = (kind: "bgs" | "commandes", html: string): Promise<string> =>
   invoke<string>("save_html_report", { kind, html });

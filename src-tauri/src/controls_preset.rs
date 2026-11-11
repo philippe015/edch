@@ -159,6 +159,78 @@ pub async fn controls_save_preset(source_file: String, change: ControlsChange) -
     Err("EDCHPro profile namespace full".into())
 }
 
+
+/// Safely applies a reviewed list of changes to ONE new profile. Never edits the source.
+fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Result<String, String> {
+    if changes.is_empty() || changes.len() > 40 {
+        return Err("between 1 and 40 confirmed changes required".into());
+    }
+    let mut used = HashSet::new();
+    // Validate against the unchanged source before rewriting any slot.
+    for change in changes {
+        if !used.insert((change.action.as_str(), change.slot.as_str())) {
+            return Err("duplicate modification of the same action and slot".into());
+        }
+        input_check(xml, change)?;
+    }
+    let mut result = xml.to_owned();
+    for change in changes {
+        // This strict operation can reject a candidate if an earlier edit removed its
+        // sole known appearance: fail safely rather than inventing device inputs.
+        result = rewrite_xml(&result, preset, change)?;
+    }
+    Ok(result)
+}
+
+/// Generates a new EDCHProNNN profile with all confirmed changes, in one create_new write.
+#[tauri::command]
+pub async fn controls_save_preset_batch(
+    source_file: String,
+    changes: Vec<ControlsChange>,
+) -> Result<ControlsPresetResult, String> {
+    if !crate::app::game_running().await.is_empty() {
+        return Err("Close Elite Dangerous and launcher before generating a profile".into());
+    }
+    if !filename_valid(&source_file) { return Err("invalid source filename".into()); }
+    if changes.is_empty() || changes.len() > 40 { return Err("1–40 changes required".into()); }
+    let base = Path::new(&crate::options::options_dir()?).join("Bindings");
+    let path = base.join(&source_file);
+    let meta = fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
+    if !meta.file_type().is_file() || meta.file_type().is_symlink() || meta.len() > 5_000_000 {
+        return Err("invalid, symlink or oversized source preset".into());
+    }
+    let xml = fs::read_to_string(&path).map_err(|e|e.to_string())?;
+    let start = xml.find("<Root ").ok_or("Root missing")?;
+    let end = start + xml[start..].find('>').ok_or("invalid Root")? + 1;
+    let root = &xml[start..end];
+    let major = attr(root, "MajorVersion").ok_or("version missing")?;
+    let minor = attr(root, "MinorVersion").ok_or("minor missing")?;
+    if major != "4" || minor.is_empty() || minor.len() > 2 || !minor.bytes().all(|b|b.is_ascii_digit()) {
+        return Err("unsupported Odyssey profile version".into());
+    }
+    // Preflight the entire rewrite before creating any destination file.
+    let validate = rewrite_xml_batch(&xml, "EDCHPro001", &changes)?;
+    if validate.len() > 5_000_000 { return Err("profile too large".into()); }
+    for n in 1..=999 {
+        let preset = format!("EDCHPro{n:03}");
+        let filename = format!("{preset}.{major}.{minor}.binds");
+        let path = base.join(&filename);
+        let changed = if n == 1 { validate.clone() } else { rewrite_xml_batch(&xml, &preset, &changes)? };
+        let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(e.to_string()),
+        };
+        if let Err(e) = file.write_all(changed.as_bytes()).and_then(|_|file.sync_all()) {
+            drop(file);
+            let _ = fs::remove_file(&path);
+            return Err(e.to_string());
+        }
+        return Ok(ControlsPresetResult { preset, filename, path: path.to_string_lossy().to_string() });
+    }
+    Err("EDCHPro profile namespace full".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,4 +246,28 @@ mod tests {
     #[test] fn refuse_entities_and_injection(){let mut x=c();x.action="YawLeftButton><root".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());assert!(rewrite_xml("<!DOCTYPE x>" ,"EDCHPro001",&c()).is_err());}
     #[test] fn no_overwrite_source_name(){assert!(!filename_valid("../Custom.4.2.binds"));assert!(!filename_valid("Custom/hi.binds"));}
     #[test] fn keep_other_modifiers(){let s=rewrite_xml(XML,"EDCHPro001",&c()).unwrap();assert!(s.contains("<Modifier Device=\"Keyboard\" Key=\"Key_A\" />"));}
+    #[test]
+    fn batch_two_changes_preserve_existing_primary_and_hotas() {
+        let second = ControlsChange { action:"HyperSuperCombination".into(), slot:"secondary".into(),
+          device:"Keyboard".into(),key:"Key_A".into(),modifiers:vec![],replace_existing:false };
+        let result = rewrite_xml_batch(XML, "EDCHPro001", &[c(),second]).unwrap();
+        assert!(result.contains("PresetName=\"EDCHPro001\""));
+        assert!(result.contains("<Secondary Device=\"SaitekX52Pro\" Key=\"Joy_2\" />"));
+        assert!(result.contains("<Secondary Device=\"Keyboard\" Key=\"Key_A\" />"));
+        assert!(result.contains("<Primary Device=\"SaitekX52Pro\" Key=\"Joy_1\""));
+    }
+    #[test]
+    fn batch_reject_duplicates_and_overlimit() {
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&[c(),c()]).is_err());
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&[]).is_err());
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&vec![c();41]).is_err());
+    }
+    #[test]
+    fn batch_rejects_unsupported_input_and_occupied_primary() {
+        let mut unknown=c();unknown.key="Joy_999".into();
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&[unknown]).is_err());
+        let mut occupied=c();occupied.slot="primary".into();
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&[occupied]).is_err());
+    }
+
 }

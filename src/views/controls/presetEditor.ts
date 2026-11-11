@@ -1,118 +1,201 @@
-/** EDCH Commandes PRO v1.6.5: explicitly creates a NEW game-readable .binds file, never live input injection. */
+/** EDCH v1.6.6 — Elite-style controls workbench with explicit review-before-save.
+ * No live game input, local ML, network data, hidden profile changes or fabricated device buttons.
+ */
 import { type BindsMeta, type Bind, parseBinds, parseXml } from "../../features/controls/binds.js";
-import { localizedActionLabel } from "../../features/controls/actionLabels.js";
-import { controlsSavePreset, isRemote, isTauri, readOptionFile, type OptionFile } from "../../platform/bridge.js";
+import { localizedActionLabel} from "../../features/controls/actionLabels.js";
+import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, type OptionFile } from "../../platform/bridge.js";
+import {
+  bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
+  recommendProfile, type ControlTab, type PresetAssignment, type SuggestedProfile,
+} from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
 
 interface SourceState { filename: string; actions: string[]; binds: Bind[] }
-const id = (entry: Bind) => JSON.stringify([entry.device,entry.key,entry.modifiers]);
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
+const MODES: { id: ControlTab; title: string }[] = [
+  { id:"all",title:"Tout" },{ id:"ship",title:"Vaisseau" },{ id:"srv",title:"VRS" },
+  { id:"foot",title:"À pied" },{ id:"ui",title:"Interface / cartes" },
+];
+const PROFILES: SuggestedProfile[]=["balanced","navigation","combat","exploration"];
 export function actionsFromXml(xml: string): string[] {
-  const root = parseXml(xml).children.find(node=>node.tag === "Root");
+  const root=parseXml(xml).children.find(node=>node.tag==="Root");
   if (!root) return [];
-  return root.children.filter(node => ACCEPTED.test(node.tag) && node.children.some(child => child.tag === "Primary" || child.tag === "Secondary"))
-    .map(node=>node.tag).sort((a,b)=>a.localeCompare(b));
+  return root.children.filter(node=>ACCEPTED.test(node.tag) && node.children.some(child=>child.tag==="Primary"||child.tag==="Secondary"))
+    .map(node=>node.tag).sort((a,b)=>a.localeCompare(b,"fr"));
 }
-/** Isolated form. All edits are staged until an explicit click and confirmation. */
+const labelSlot=(slot: "primary"|"secondary")=>slot==="primary"?"Principale":"Secondaire";
+const readKey=(entry?:Bind)=>entry?`${entry.device} : ${entry.key}${entry.modifiers.length?" + "+entry.modifiers.map(m=>m.key).join(" + "):""}`:"Non attribuée";
+
 export class ControlsPresetEditor {
   private selected="";
-  private action="";
-  private slot:"primary"|"secondary"="secondary";
-  private input="";
-  private confirmReplacement=false;
-  private busy=false;
-  private message="";
   private source?:SourceState;
+  private attempted="";
+  private generation=0;
+  private loading=false;
+  private saving=false;
+  private message="";
+  private mode:ControlTab="ship";
+  private query="";
+  private profile:SuggestedProfile="balanced";
+  private editAction="";
+  private editSlot:"primary"|"secondary"="secondary";
+  private editInput="";
+  private replace=false;
+  private staged:PresetAssignment[]=[];
+  private acknowledgeWarnings=false;
   private host?:HTMLElement;
   private context?:{meta:BindsMeta;files:OptionFile[];active:string;reload:()=>Promise<void>};
-  private generation=0;
-  private attempted="";
+
   render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>):HTMLElement {
     this.context={meta,files,active,reload};
-    const names=files.filter(f=>f.folder==="Bindings"&&f.name.toLowerCase().endsWith(".binds")&&f.size<=5_000_000).map(f=>f.name);
+    const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
+      .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
       this.selected=names.includes(active)?active:names[0]??"";
-      this.source=undefined;this.action="";this.input="";this.attempted="";
+      this.source=undefined;this.attempted="";this.staged=[];this.editAction="";
     }
-    if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.busy) void this.loadSource(this.selected);
-    const source=this.source?.filename===this.selected ? this.source : undefined;
-    if (source && !source.actions.includes(this.action)) this.action=source.actions[0]??"";
-    const inputs=source?.binds.filter(b=>b.slot!=="axis")??[];
-    // Only already observed input IDs: no fabricated joystick button or axis identifiers.
-    const unique=[...new Map(inputs.map(b=>[id(b),b])).values()].sort((a,b)=>
-      a.device.localeCompare(b.device)||a.key.localeCompare(b.key));
-    if (unique.length&&!unique.some(x=>id(x)===this.input))this.input=id(unique[0]);
-    const current=source?.binds.find(x=>x.action===this.action&&x.slot===this.slot);
-    const selected=unique.find(x=>id(x)===this.input);
-    const opt=(label:string,value:string,selected:boolean)=>h("option",{value,selected},label);
-    const sourceSelect=h("select",{value:this.selected,disabled:this.busy,
-      onchange:(e:Event)=>{
-        this.selected=(e.target as HTMLSelectElement).value;
-        this.source=undefined;this.action="";this.input="";this.attempted="";this.message="";this.confirmReplacement=false;
-        this.repaint();
-      },
-    },...names.map(name=>opt(name,name,name===this.selected)));
-    const actionSelect=h("select",{value:this.action,disabled:this.busy||!source,
-      onchange:(e:Event)=>{this.action=(e.target as HTMLSelectElement).value;this.confirmReplacement=false;this.repaint();},
-    },...(source?.actions??[]).map(action=>opt(`${localizedActionLabel(meta,action)} · ${action}`,action,this.action===action)));
-    const inputSelect=h("select",{value:this.input,disabled:this.busy||!source,
-      onchange:(e:Event)=>{this.input=(e.target as HTMLSelectElement).value;this.repaint();},
-    },...unique.map(b=>opt(`${b.device} · ${b.key}${b.modifiers.length?" + "+b.modifiers.map(m=>m.key).join(" + "):""}`,
-      id(b),id(b)===this.input)));
-    const slotSelect=h("select",{value:this.slot,disabled:this.busy,
-      onchange:(e:Event)=>{this.slot=(e.target as HTMLSelectElement).value as "primary"|"secondary";this.confirmReplacement=false;this.repaint();},
-    },opt("Principal","primary",this.slot==="primary"),opt("Secondaire","secondary",this.slot==="secondary"));
-    const replacing=Boolean(current);
-    this.host=h("section.card.edch-controls-write-v165",null,
-      h("h3",null,"Configuration Elite Dangerous · v1.6.5"),
-      h("p.sub",null,"Crée un nouveau profil .binds directement dans le dossier du jeu. Aucun appui simulé, aucun profil existant écrasé. Fermer Elite Dangerous et son lanceur avant d'enregistrer."),
-      names.length? h("div.legend-grid",null,
-        h("label",null,"Profil source ",sourceSelect),
-        h("label",null,"Commande à configurer ",actionSelect),
-        h("label",null,"Emplacement ",slotSelect),
-        h("label",null,"Touche ou bouton connu ",inputSelect),
-      ):h("p.notice",null,"Aucun profil .binds personnel trouvé. Enregistre d'abord une affectation dans Elite Dangerous pour créer un profil Custom."),
-      replacing?h("p.sub",null,`Affectation actuelle : ${current!.device} · ${current!.key}. Son remplacement ne concerne que le nouveau profil.`):null,
-      replacing?h("label",null,h("input",{type:"checkbox",checked:this.confirmReplacement,
-        onchange:(e:Event)=>{this.confirmReplacement=(e.target as HTMLInputElement).checked;this.repaint();}
-      })," J'autorise explicitement le remplacement de cet emplacement dans le nouveau profil"):null,
-      h("p.sub",null,"Les boutons HOTAS proposés proviennent du fichier .binds source. Les axes analogiques ne sont pas éditables dans cette version."),
-      h("button.primary",{type:"button",disabled:this.busy||!source||!selected||!this.action||(replacing&&!this.confirmReplacement)||!isTauri()||isRemote(),
-        onclick:()=>{void this.save();}},this.busy?"Création…":"Créer le profil pour Elite Dangerous"),
-      this.message?h("p",{role:"status"},this.message):null,
-      h("p.sub",null,"Après création : lancer le jeu → Options → Commandes → Préréglages, puis sélectionner le profil EDCHPro dans la catégorie voulue et appliquer. Avec Odyssey, vérifier séparément Général, Vaisseau, VRS et À pied."),
-    );
+    if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
+    const src=this.source?.filename===this.selected?this.source:undefined;
+    const inputs=src?inputCatalog(src.binds):[];
+    const rows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
+    if (src && this.editAction && !src.actions.includes(this.editAction)) this.editAction="";
+    if (inputs.length && !inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=bindingKey(inputs[0]);
+    const editsWarnings=src?occupancyWarnings(src.binds,this.staged,meta):[];
+    const canSave=Boolean(src && this.staged.length && this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
+      && (!editsWarnings.length || this.acknowledgeWarnings) && isTauri() && !isRemote() && !this.loading && !this.saving);
+    const selectedAction=src?.actions.includes(this.editAction)?this.editAction:"";
+    const old=src?.binds.find(b=>b.action===selectedAction&&b.slot===this.editSlot);
+    const selectedInput=inputs.find(x=>bindingKey(x)===this.editInput);
+    const choose=(label:string,value:string,selected=false)=>h("option",{value,selected},label);
+    const btn=(text:string,fn:()=>void,disabled=false,style="")=>h(`button.edch-c166-btn${style?"."+style:""}`,{type:"button",disabled,onclick:fn},text);
+    const sourceSelect=h("label.edch-c166-source",null,"Profil Elite Dangerous",h("select",{value:this.selected,disabled:this.loading||this.saving,
+      onchange:(e:Event)=>{this.generation++;this.selected=(e.target as HTMLSelectElement).value;this.source=undefined;
+        this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
+    },...names.map(name=>choose(name,name,name===this.selected))));
+    const heading=h("div.edch-c166-heading",null,
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes PRO · v1.6.6"),
+        h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
+      h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
+        this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
+    const topTabs=h("div.edch-c166-tabs",{role:"tablist","aria-label":"Catégories de commandes"},...MODES.map(x=>
+      h("button",{type:"button",role:"tab","aria-selected":this.mode===x.id,class:this.mode===x.id?"active":"",
+        onclick:()=>{this.mode=x.id;this.repaint();}},x.title)));
+    const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
+      placeholder:"Rechercher une commande française ou son identifiant…",oninput:(e:Event)=>{
+        this.query=(e.target as HTMLInputElement).value;this.repaint("search");
+      }}));
+    const table=h("div.edch-c166-scroll",null,h("table.edch-c166-table",null,
+      h("thead",null,h("tr",null,...["Commande","Principale","Secondaire","Attribuer"].map(s=>h("th",null,s)))),
+      h("tbody",null,...rows.slice(0,200).map(row=>{
+        const button=(slot:"primary"|"secondary")=>btn(slot==="primary"?"P":"S",()=>{
+          this.editAction=row.action;this.editSlot=slot;this.replace=false;this.message="";this.repaint();
+        },false, this.editAction===row.action&&this.editSlot===slot?"selected":"");
+        const value=(b?:Bind)=>h("span",{class:b?"edch-c166-bound":"edch-c166-unbound"},b?readKey(b):"— Libre —");
+        return h("tr",{class:this.editAction===row.action?"edch-c166-current":""},
+          h("td",null,h("strong",null,localizedActionLabel(meta,row.action)),h("small",null,row.action)),
+          h("td",null,value(row.primary)),h("td",null,value(row.secondary)),h("td",null,button("primary")," ",button("secondary")));
+      })),
+    ),
+    rows.length>200?h("p.edch-c166-muted",null,`200 sur ${rows.length} commandes affichées : affine la recherche.`):null,
+    !rows.length?h("p.edch-c166-muted",null,"Aucune commande pour cette recherche."):null);
+    const rowPane=h("section.edch-c166-pane.edch-c166-list",null,h("div.edch-c166-section-title",null,h("h4",null,"Commandes du jeu"),
+      h("span",null,`${rows.length} résultat(s)`)),topTabs,search,table);
+    const chooseInput=h("select",{value:this.editInput,disabled:this.saving||!src,
+      onchange:(e:Event)=>{this.editInput=(e.target as HTMLSelectElement).value;this.repaint();}},...inputs.map(i=>choose(readKey(i),bindingKey(i),this.editInput===bindingKey(i))));
+    const editBox=h("section.edch-c166-pane",null,
+      h("h4",null,"Modifier une attribution"),
+      selectedAction ? h("div",null,
+        h("p.edch-c166-keyname",null,localizedActionLabel(meta,selectedAction)),
+        h("p.edch-c166-muted",null,`${labelSlot(this.editSlot)} · actuelle : ${readKey(old)}`),
+        h("label.edch-c166-field",null,"Nouveau bouton ou touche reconnu",chooseInput),
+        old?h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.replace,onchange:(e:Event)=>{
+          this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
+        btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
+      ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
+    const suggestions=src?PROFILES.map(p=>recommendProfile(p,src.actions,src.binds,meta)):[];
+    const selectedAdvice=suggestions.find(x=>x.kind===this.profile);
+    const adviceBox=h("section.edch-c166-pane",null,
+      h("h4",null,"Profils intelligents proposés"),
+      h("p.edch-c166-muted",null,"Suggestions calculées hors ligne d'après les commandes réellement présentes. Aucune touche n'est inventée."),
+      h("label.edch-c166-field",null,"Style d'utilisation",h("select",{value:this.profile,disabled:this.loading||this.saving,
+        onchange:(e:Event)=>{this.profile=(e.target as HTMLSelectElement).value as SuggestedProfile;this.repaint();}},
+        ...suggestions.map(x=>choose(x.name,x.kind,x.kind===this.profile)))),
+      selectedAdvice?h("p.edch-c166-muted",null,selectedAdvice.description):null,
+      selectedAdvice?h("p",null,`${selectedAdvice.covered}/${selectedAdvice.relevant} commandes ciblées déjà attribuées · ${selectedAdvice.changes.length} proposition(s) prudente(s).`):null,
+      selectedAdvice && !selectedAdvice.changes.length?h("p.edch-c166-muted",null,selectedAdvice.warnings[0]):null,
+      btn("Préparer les suggestions",()=>this.stageAdvice(selectedAdvice),!selectedAdvice?.changes.length||this.loading||this.saving,"primary"),
+      h("p.edch-c166-muted",null,"Les propositions ne remplissent que les commandes libres, avec une touche connue, cohérente avec l’action et non utilisée dans le même contexte. Aucune attribution aléatoire."));
+    const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
+      this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
+        h("span",null,h("strong",null,localizedActionLabel(meta,change.action)),
+          h("small",null,`${labelSlot(change.slot)} → ${change.device} ${change.key}`)),
+        btn("Retirer",()=>{this.staged.splice(index,1);this.acknowledgeWarnings=false;this.repaint();})))):
+        h("p.edch-c166-muted",null,"Aucune modification préparée. Ton profil original est conservé."),
+      editsWarnings.length?h("div.edch-c166-warning",null,
+        h("strong",null,"Points à examiner"),...editsWarnings.map(x=>h("p",null,x)),
+        h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.acknowledgeWarnings,
+          onchange:(e:Event)=>{this.acknowledgeWarnings=(e.target as HTMLInputElement).checked;this.repaint();}}),
+          " J'ai vérifié les touches partagées et j'accepte ce brouillon")):null,
+      h("div.edch-c166-actions",null,
+        btn(this.saving?"Création du profil…":"Créer un nouveau profil pour Elite Dangerous",()=>{void this.save();},!canSave,"primary"),
+        btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
+      this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
+      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer le profil ; sélectionne ensuite EDCHPro dans les préréglages du jeu (Général, Vaisseau, VRS et À pied selon la catégorie)."));
+    const right=h("div.edch-c166-right",null,editBox,adviceBox,draftBox);
+    this.host=h("section.card.edch-controls-write-v166",null,heading,
+      !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
+      h("div.edch-c166-layout",null,rowPane,right),
+      h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
     return this.host;
   }
-  private repaint(){const c=this.context;if(this.host?.isConnected&&c)this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));}
-  private async loadSource(name:string){
-    if(this.busy)return;
-    const gen=++this.generation;this.attempted=name;this.busy=true;this.repaint();
-    try{
+
+  private repaint(focus?:"search") {
+    const c=this.context;
+    if (!this.host?.isConnected||!c)return;
+    this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));
+    if(focus){const input=this.host.querySelector<HTMLInputElement>(".edch-c166-search input");if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}}
+  }
+  private async loadSource(name:string) {
+    const gen=++this.generation;this.attempted=name;this.loading=true;this.repaint();
+    try {
       const xml=await readOptionFile("Bindings",name);
       if(gen!==this.generation||name!==this.selected)return;
       const parsed=parseBinds(xml);
       this.source={filename:name,binds:parsed.binds,actions:actionsFromXml(xml)};
       this.message="";
-    }catch(e){this.message=`Lecture du profil impossible : ${String(e)}`;}finally{
-      if(gen===this.generation){this.busy=false;this.repaint();}
-    }
+    } catch(e){if(gen===this.generation)this.message=`Lecture impossible : ${String(e)}`;}
+    finally{if(gen===this.generation){this.loading=false;this.repaint();}}
+  }
+  private stageSingle(meta:BindsMeta){
+    const source=this.source;
+    const selected=inputCatalog(source?.binds??[]).find(b=>bindingKey(b)===this.editInput);
+    if(!source||!selected||!source.actions.includes(this.editAction))return;
+    const next:PresetAssignment={action:this.editAction,slot:this.editSlot,device:selected.device,key:selected.key,
+      modifiers:selected.modifiers.map(x=>({...x})),replaceExisting:this.replace};
+    if(!isStagedAssignmentValid(next,source.actions,source.binds))return;
+    this.staged=this.staged.filter(x=>x.action!==next.action||x.slot!==next.slot).concat(next);
+    this.acknowledgeWarnings=false;this.message="";this.repaint();
+  }
+  private stageAdvice(advice:ReturnType<typeof recommendProfile>|undefined){
+    if(!advice?.changes.length)return;
+    if(this.staged.length&&!window.confirm("Remplacer le brouillon par les suggestions ? Le profil du jeu ne sera pas modifié."))return;
+    this.staged=advice.changes.map(c=>({...c,modifiers:c.modifiers.map(m=>({...m}))}));
+    this.acknowledgeWarnings=false;this.message=`${this.staged.length} suggestion(s) prêtes. Vérifie chaque touche avant de créer un profil.`;this.repaint();
   }
   private async save(){
     const ctx=this.context,source=this.source;
-    if(!ctx||!source||source.filename!==this.selected||this.busy||!this.action)return;
-    const chosen=source.binds.find(b=>id(b)===this.input);
-    const current=source.binds.find(b=>b.action===this.action&&b.slot===this.slot);
-    if(!chosen||chosen.slot==="axis"||(current&&!this.confirmReplacement))return;
-    if(!window.confirm(`Créer un NOUVEAU profil pour Elite Dangerous ?\n\n${localizedActionLabel(ctx.meta,this.action)} (${this.slot}) → ${chosen.device} · ${chosen.key}\n\nFerme le jeu et son lanceur. Le profil original sera conservé.`))return;
-    this.busy=true;this.repaint();
+    if(!ctx||!source||source.filename!==this.selected||!this.staged.length||this.saving||this.loading)return;
+    if(!this.staged.every(c=>isStagedAssignmentValid(c,source.actions,source.binds)))return;
+    const warnings=occupancyWarnings(source.binds,this.staged,ctx.meta);
+    if(warnings.length&&!this.acknowledgeWarnings)return;
+    if(!window.confirm(`Créer un NOUVEAU profil EDCHPro avec ${this.staged.length} modification(s) ?\n\nProfil source : ${source.filename}\nLes profils existants restent intacts.\nFerme Elite Dangerous et son lanceur avant d'enregistrer.`))return;
+    this.saving=true;this.repaint();
     try{
-      const out=await controlsSavePreset(source.filename,{
-        action:this.action,slot:this.slot,device:chosen.device,key:chosen.key,
-        modifiers:chosen.modifiers,replaceExisting:Boolean(current&&this.confirmReplacement),
-      });
-      this.message=`Profil ${out.preset} créé : ${out.path}. Redémarre Elite Dangerous et sélectionne ${out.preset} dans Options → Commandes → Préréglages.`;
+      const out=await controlsSavePresetBatch(source.filename,this.staged);
+      this.staged=[];this.acknowledgeWarnings=false;
+      this.message=`Profil ${out.preset} créé : ${out.path}. Choisis ce préréglage dans Options → Commandes du jeu après son redémarrage.`;
       await ctx.reload();
-    }catch(e){this.message=`Création refusée : ${String(e)}`;}finally{this.busy=false;this.repaint();}
+    }catch(e){this.message=`Création du profil refusée : ${String(e)}`;}
+    finally{this.saving=false;this.repaint();}
   }
 }
