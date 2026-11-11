@@ -10,6 +10,7 @@ import {
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
+import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 
 interface SourceState { filename: string; actions: string[]; binds: Bind[] }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
@@ -45,6 +46,7 @@ export class ControlsPresetEditor {
   private staged:PresetAssignment[]=[];
   private acknowledgeWarnings=false;
   private hotasStudio = new HotasStudio();
+  private x52Modes = new X52ModesPanel();
   private host?:HTMLElement;
   private context?:{meta:BindsMeta;files:OptionFile[];active:string;reload:()=>Promise<void>};
 
@@ -150,10 +152,22 @@ export class ControlsPresetEditor {
       this.message = `HOTAS : ${candidate.device} ${candidate.key} sélectionné. Choisis une commande, puis ajoute au brouillon.`;
       this.repaint();
     });
+    const modeProfiles=this.x52Modes.render(meta,src?.actions ?? [],src?.binds ?? [],this.selected,(modeId) => {
+      if (!src) return;
+      const style: SuggestedProfile = modeId===1 ? "navigation" : modeId===2 ? "combat" : "exploration";
+      this.profile=style;
+      const advice=recommendProfile(style,src.actions,src.binds,meta);
+      if (advice.changes.length) this.stageAdvice(advice);
+      else {
+        this.message=`Mode ${modeId} — ${advice.name} : aucune attribution sûre à ajouter automatiquement. Les commandes existantes sont conservées ; tu peux les modifier avec P/S.`;
+        this.repaint();
+      }
+    });
     const right=h("div.edch-c166-right",null,hotas,editBox,adviceBox,draftBox);
     this.host=h("section.card.edch-controls-write-v166",null,heading,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       h("div.edch-c166-layout",null,rowPane,right),
+      modeProfiles,
       h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
     return this.host;
   }
