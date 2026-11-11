@@ -24,6 +24,8 @@ mod logs;
 mod ntfy;
 mod options;
 mod foot_binds; // EDCH-ONFOOT-EDIT-v1.4.4
+mod controls_preset; // EDCH-COMMANDES-JEU-v1.6.5
+mod report_html; // EDCH-REPORTS-HTML-v1.6.5
 mod paths;
 mod remote;
 mod system;
@@ -83,6 +85,8 @@ pub fn run() {
             options::export_config,
             options::import_config,
             foot_binds::foot_save_preset,
+            controls_preset::controls_save_preset,
+            report_html::save_html_report,
             system::reveal_path,
             system::installer_language,
             remote::remote_start,
