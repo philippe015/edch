@@ -554,6 +554,31 @@ export class BgsView implements View {
       exploration: "Exploration vendue",
     };
     const recent = profile.entries.slice(-20).reverse();
+    // v1.6.8.3: show all active journal missions in BGS, not only completed live activity.
+    // The source is the existing Missions module, including journal history on startup.
+    const currentMissions = Object.values(this.ctx.store.state.activity.missions)
+      .sort((a,b) => (a.expiry ?? "").localeCompare(b.expiry ?? "")).slice(0,40);
+    const currentMissionTotal = Object.keys(this.ctx.store.state.activity.missions).length;
+    const currentMissionPanel = h("section.card.bgs-panel", null,
+      h("h3", null, "Missions actives · Odyssey / au sol inclus"),
+      h("p.sub", null,
+        "Missions connues du journal, y compris au sol. L'absence de marqueur Odyssey n'exclut pas une mission au sol. Une mission n'est terminée que lorsque le journal émet MissionCompleted."),
+      h("p", null, `${currentMissionTotal} mission(s) active(s) enregistrée(s) dans EDCH · ${currentMissions.length} affichée(s)`),
+      currentMissions.length
+        ? h("div.bgs-table-scroll", null, h("table.bgs-table", null,
+            h("thead", null, h("tr", null,
+              ...["Mission", "Faction attributrice", "Destination", "État", "Type"].map(s=>h("th",null,s)))),
+            h("tbody", null, ...currentMissions.map(m => h("tr", null,
+              h("td", null, m.title || m.name || "Mission sans titre"),
+              h("td", null, m.faction || "Non indiquée par le journal"),
+              h("td", null, [m.destSystem, m.destStation].filter(Boolean).join(" · ") || "Non indiquée"),
+              h("td", null, m.status === "redirected" ? "Objectif modifié" : "En cours"),
+              h("td", null, /(?:^|[_-])(onfoot|odyssey)(?:[_-]|$)/i.test(m.name) ? "Odyssey (marqueur du journal)" : "Non précisé")
+            )))
+          ))
+        : h("p.sub", null, "Aucune mission active trouvée dans les journaux chargés. Vérifie aussi l'onglet Missions et le dossier de journaux dans Paramètres."),
+      h("p.sub", null, "Les missions achevées avant le lancement d'EDCH ne sont pas ajoutées rétroactivement aux compteurs BGS; aucune influence n'est déduite.")
+    );
     const stats = [
       ["Événements (30 j)", summary.entries30],
       ["Sauts FSD (30 j)", summary.jumps],
@@ -676,6 +701,7 @@ export class BgsView implements View {
               "Ce CMDR suit une autre faction que celle chargée dans l'onglet BGS : les totaux de systèmes suivis ne sont pas attribués à ce profil.",
             )
           : null,
+        currentMissionPanel,
         h("h3", null, "Activités confirmées par le journal · 30 derniers jours"),
         statsEl,
         h(
