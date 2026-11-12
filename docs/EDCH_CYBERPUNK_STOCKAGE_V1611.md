@@ -17,7 +17,7 @@ Dans **Paramètres → Avancé → Stockage et sauvegardes**, cliquer sur **Anal
 - fichiers `.binds` dans le répertoire configuré par Elite Dangerous, quand détecté ;
 - présence, taille et date de modification des bases `edch-bgs.sqlite3` et `edch-agent-memory-v153.sqlite3` ;
 - nombre et dernière modification des sauvegardes SQLite des agents ;
-- test de cohérence de la base BGS avec `PRAGMA quick_check` par le bouton **Tester l'intégrité BGS SQLite**.
+- test de cohérence de la base BGS avec `PRAGMA quick_check` en mode `SQLITE_OPEN_READ_ONLY` (aucune base créée si elle est absente) par le bouton **Tester l'intégrité BGS SQLite**.
 
 Cliquer sur **Copier chemin** pour copier un emplacement sans ouvrir de dossier ni modifier un fichier.
 
