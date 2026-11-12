@@ -27,6 +27,8 @@ export interface WingMission {
   reward?: number;
   commodity?: string;
   count?: number;
+  /** EDCH-BGS-WING-RECEIPTS-v1.4.9.1: acknowledged by the member in the game, NOT detected in the journal. */
+  manualConfirmed?: boolean;
 }
 
 export interface WingMember {
@@ -170,6 +172,8 @@ export function mergeMission(a: WingMission, b: WingMission): WingMission {
 export interface WingRow {
   mission: WingMission;
   holders: string[];
+  /** Which holders explicitly confirmed manually (not journal proof). */
+  manualHolders: string[];
   /** Ids of active members who don't have it. */
   missing: string[];
   mine: boolean;
@@ -191,12 +195,13 @@ export function wingRows(me: WingMember, others: WingMember[], now = Date.now())
     for (const mission of m.missions) {
       let row = rows.find((r) => sameMission(r.mission, mission));
       if (!row) {
-        row = { mission: { ...mission }, holders: [], missing: [], mine: false };
+        row = { mission: { ...mission }, holders: [], manualHolders: [], missing: [], mine: false };
         rows.push(row);
       } else {
         row.mission = mergeMission(row.mission, mission);
       }
       if (!row.holders.includes(m.id)) row.holders.push(m.id);
+      if (mission.manualConfirmed && !row.manualHolders.includes(m.id)) row.manualHolders.push(m.id);
       if (m.id === me.id) row.mine = true;
     }
   }

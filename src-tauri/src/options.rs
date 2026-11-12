@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 //! The game's option files (key bindings, graphics): list, read, export to a zip in
 //! Documents\\EDCH, and import from a zip (the current files are always backed up first). Only the
 //! Bindings and Graphics folders, and only the file types the game uses, are ever touched.
@@ -171,7 +172,19 @@ pub fn export_config(include_graphics: bool) -> Result<String, String> {
 #[tauri::command]
 pub fn import_config(data: Vec<u8>) -> Result<ImportReport, String> {
     use std::io::Read as _;
+    const MAX_ZIP_BYTES: usize = 16 * 1024 * 1024;
+    const MAX_ENTRIES: usize = 128;
+    const MAX_SINGLE: u64 = 2 * 1024 * 1024;
+    const MAX_TOTAL: u64 = 12 * 1024 * 1024;
+    if data.len() > MAX_ZIP_BYTES {
+        return Err("zipTooLarge".into());
+    }
     let mut archive = zip::ZipArchive::new(std::io::Cursor::new(data)).map_err(|e| format!("unreadableZip: {e}"))?;
+    if archive.len() > MAX_ENTRIES {
+        return Err("zipTooManyEntries".into());
+    }
+    let mut total_size: u64 = 0;
+    let mut names = std::collections::HashSet::new();
     // Validate everything before touching the game's files.
     let mut files: Vec<(String, String, Vec<u8>)> = Vec::new();
     let mut skipped = Vec::new();
@@ -190,8 +203,26 @@ pub fn import_config(data: Vec<u8>) -> Result<ImportReport, String> {
             .map(|w| (w[0].to_string(), w[1].to_string()));
         match pair {
             Some((folder, name)) if parts.last() == Some(&name.as_str()) && allowed_option_file(&folder, &name) => {
+                // Preflight limits before decompression, then enforce again on the stream.
+                if entry.size() > MAX_SINGLE || total_size.saturating_add(entry.size()) > MAX_TOTAL {
+                    return Err("zipExpandedTooLarge".into());
+                }
+                if !names.insert((folder.clone(), name.clone())) {
+                    return Err("zipDuplicateFile".into());
+                }
                 let mut bytes = Vec::new();
-                entry.read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+                entry
+                    .by_ref()
+                    .take(MAX_SINGLE + 1)
+                    .read_to_end(&mut bytes)
+                    .map_err(|e| e.to_string())?;
+                if bytes.len() as u64 > MAX_SINGLE {
+                    return Err("zipExpandedTooLarge".into());
+                }
+                total_size = total_size.saturating_add(bytes.len() as u64);
+                if total_size > MAX_TOTAL {
+                    return Err("zipExpandedTooLarge".into());
+                }
                 files.push((folder, name, bytes));
             }
             _ => skipped.push(full),

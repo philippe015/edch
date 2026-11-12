@@ -143,6 +143,18 @@ export class AboutView implements View {
           h("p", null, t("about.dreamtUpFlown") + " ", h("strong", { "data-no-tr": "" }, "CMDR MDLuffy"), "."),
           h("p.sub", null, t("about.thanksUsingEdchIfCrossPaths")),
         ),
+        h(
+          "section.card.about-community-contribution",
+          null,
+          h("h3", null, t("about.communityContributorTitle")),
+          h(
+            "p",
+            null,
+            h("strong", { "data-no-tr": "" }, "Cyberpunk Philou"),
+            " — ",
+            t("about.communityContributorDescription"),
+          ),
+        ),
         supportCard(),
         h(
           "section.card",

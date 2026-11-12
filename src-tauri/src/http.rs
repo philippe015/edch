@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 //! HTTP for the UI: requests to a short list of allowed hosts (Spansh, EDDN, EDSM, Inara, ntfy),
 //! made from Rust because the webview can't reach them (CORS). URLs are redacted in the logs.
 
@@ -13,8 +14,9 @@ pub struct HttpReply {
 }
 
 /// Hosts the UI may talk to. Everything else is refused.
-const ALLOWED_HOSTS: [&str; 7] = [
+const ALLOWED_HOSTS: [&str; 8] = [
     "https://ntfy.sh/",
+    "https://tick.edcd.io/",
     "https://spansh.co.uk/",
     "https://www.spansh.co.uk/",
     "https://eddn.edcd.io:4430/",
@@ -36,6 +38,7 @@ pub fn blocking_http(
     }
     let agent = ureq::AgentBuilder::new()
         .timeout(Duration::from_secs(30))
+        .redirects(0) // A 3xx to a different host must NOT escape the allow-list.
         .user_agent(concat!("EDCH/", env!("CARGO_PKG_VERSION")))
         .build();
     let request = agent.request(&method.to_uppercase(), url);

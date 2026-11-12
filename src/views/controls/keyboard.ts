@@ -1,7 +1,8 @@
+import { localizedActionLabel, localizedComboLabel, localizedKeyLabel } from "../../features/controls/actionLabels.js";
 // The keyboard picture: each key with the actions bound to it, in the chosen layout (QWERTY,
 // AZERTY, QWERTZ) and format (ISO, ANSI), with the switches to change them.
 
-import { actionName, type Bind, type BindsMeta, comboLabel, groupOf, keyLabel } from "../../features/controls/binds.js";
+import { type Bind, type BindsMeta, groupOf } from "../../features/controls/binds.js";
 import { lang, t } from "../../platform/i18n.js";
 import type { Ctx } from "../../state/context.js";
 import { h } from "../../ui/dom.js";
@@ -82,11 +83,11 @@ export function keyboard(
       {
         style: { flexGrow: String(w), flexBasis: `${w * 44}px` },
         title: list.length
-          ? list.map((b) => `${comboLabel(meta, b)} → ${actionName(meta, b.action)}`).join("\n")
+          ? list.map((b) => `${localizedComboLabel(meta, b)} → ${localizedActionLabel(meta, b.action)}`).join("\n")
           : label,
       },
       tail ? null : h("span.kb-cap", null, label),
-      list.length && !tail ? h("span.kb-act", null, actionName(meta, list[0].action)) : null,
+      list.length && !tail ? h("span.kb-act", null, localizedActionLabel(meta, list[0].action)) : null,
       list.length > 1 && !tail ? h("span.kb-more", null, `+${list.length - 1}`) : null,
     );
   };
@@ -193,9 +194,13 @@ export function keyboard(
       ? h(
           "p.sub",
           null,
-          t("controls.keysNotDiagram", { value: [...new Set(others.map((b) => keyLabel(meta, b.key)))].join(", ") }),
+          t("controls.keysNotDiagram", {
+            value: [...new Set(others.map((b) => localizedKeyLabel(meta, b.key)))].join(", "),
+          }),
         )
       : null,
     legendTable(meta, binds),
   );
 }
+
+// EDCH-BINDS-FR-v1.3.1 — traduction des commandes et des touches.

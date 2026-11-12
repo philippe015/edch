@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 // The window's layout (top bar, menu, page, detail panel), the pages, and which one is shown.
 // Each page draws in its own container, so a page you left never redraws over the current one.
 
@@ -7,6 +8,7 @@ import { excludedHere, renderMenu } from "../ui/menu/editMenu.js";
 import { NAV, visibleNav } from "../ui/menu/pages.js";
 import { applyTheme } from "../ui/theme.js";
 import { AboutView } from "../views/about/index.js";
+import { BgsView } from "../views/bgs/index.js";
 import { ColonisationView } from "../views/colonisation/index.js";
 import { ControlsView } from "../views/controls/index.js";
 import { DetailPanel } from "../views/detail/index.js";
@@ -51,6 +53,7 @@ function createViews(ctx: Ctx, replayJournal: () => void): Record<string, View> 
     wishlist: new WishlistView(ctx),
     engineers: new EngineersView(ctx),
     search: new SearchView(ctx),
+    bgs: new BgsView(ctx),
     navigation: new NavigationView(ctx),
     sync: new SyncView(ctx),
     controls: new ControlsView(ctx),

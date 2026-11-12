@@ -18,7 +18,9 @@ import {
 } from "../../ui/notifier.js";
 import type { Store } from "../../state/store.js";
 import { hoursLeft, relTime } from "../../ui/format.js";
+import { manualWingCopies, wingScope } from "./wingManual.js"; // EDCH-BGS-WING-RECEIPTS-v1.4.9.1
 import {
+  isActive,
   sameMission,
   toWingMission,
   toWingMissions,
@@ -79,13 +81,47 @@ export function setShared(id: number, on: boolean) {
   missionsChanged();
 }
 
+/** Confirmation déclarative, révocable, d'une mission reçue par un autre CMDR. */
+export function hasManualReceived(id: number): boolean {
+  const s = store.state.settings.wing;
+  return (s.manualReceived ?? []).some((r) => r.id === id && r.code === wingScope(s.code));
+}
+
+export function setManualReceived(id: number, on: boolean): boolean {
+  if (isRemote() || !link || !Number.isSafeInteger(id) || id <= 0) return false;
+  const s = store.state.settings.wing;
+  const code = wingScope(s.code);
+  if (!s.enabled || code.length < 8) return false;
+  const existing = Array.isArray(s.manualReceived) ? s.manualReceived : [];
+  if (on) {
+    if (hasManualReceived(id)) return true;
+    // Must originate from a currently active member's JOURNAL mission, not a forwarded receipt.
+    const source = [...link.members.values()]
+      .filter((m) => isActive(m))
+      .flatMap((m) => m.missions)
+      .find((m) => m.id === id && !m.manualConfirmed);
+    if (!source) return false;
+    if (source.expiry && Number.isFinite(Date.parse(source.expiry)) && Date.parse(source.expiry) <= Date.now())
+      return false;
+    if (activeMissions().some((m) => m.id === id)) return false;
+    if (toWingMissions(activeMissions(), isShared).length >= 20) return false;
+  }
+  const kept = existing.filter((r) => !(r.id === id && r.code === code));
+  if (on) kept.push({ id, code, at: new Date().toISOString() });
+  store.updateSettings({ wing: { ...s, manualReceived: kept.slice(-100) } });
+  missionsChanged();
+  return true;
+}
+
 export function wingMe(): WingMember {
   const s = store.state.settings.wing;
+  const mine = toWingMissions(activeMissions(), isShared);
+  const known = link ? [...link.members.values()].filter((m) => isActive(m)).flatMap((m) => m.missions) : [];
   return {
     id: wingId(),
     name: s.name.trim() || store.state.cmdr.commander || "CMDR",
     at: new Date().toISOString(),
-    missions: toWingMissions(activeMissions(), isShared),
+    missions: [...mine, ...manualWingCopies(s.manualReceived ?? [], s.code, known, mine)].slice(0, 20),
   };
 }
 
@@ -357,7 +393,14 @@ function panel(): (Node | null)[] {
                       r.mission.expiry ? ` · ${relTime(r.mission.expiry)}` : "",
                     ),
                     h("span.side-holders", null, [
-                      ...r.holders.map((id) => h("span.badge.ok", null, `✓ ${names.get(id) ?? "?"}`)),
+                      ...r.holders.map((id) =>
+                        h(
+                          "span.badge.ok",
+                          null,
+                          `✓ ${names.get(id) ?? "?"}`,
+                          (r.manualHolders ?? []).includes(id) ? ` (${t("missions.manualConfirmation")})` : "",
+                        ),
+                      ),
                       ...r.missing.map((id) => h("span.badge.muted", null, `… ${names.get(id) ?? "?"}`)),
                     ]),
                   ),

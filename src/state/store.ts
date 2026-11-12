@@ -132,6 +132,8 @@ export interface WingSettings {
   autoShare: boolean;
   /** Ids of the missions shared by hand. */
   shared: number[];
+  /** EDCH-BGS-WING-RECEIPTS-v1.4.9.1: explicit acknowledgements, scoped to the wing code. */
+  manualReceived: { id: number; code: string; at: string }[];
 }
 
 export interface MiningSettings {
@@ -165,6 +167,7 @@ export const DEFAULT_WING: WingSettings = {
   notifyLeave: true,
   autoShare: false,
   shared: [],
+  manualReceived: [],
 };
 export const DEFAULT_MINING: MiningSettings = {
   targets: [

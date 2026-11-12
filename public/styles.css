@@ -3040,8 +3040,8 @@ ul.plain {
   right: 0;
   top: 42%;
   z-index: 55;
-  writing-mode: vertical-rl;
-  transform: rotate(180deg);
+  writing-mode: vertical-lr;
+  transform: none;
   background: var(--panel-2);
   border: 1px solid var(--line-2);
   border-right: 0;
@@ -3074,7 +3074,7 @@ ul.plain {
 }
 .side-tab-badge {
   writing-mode: horizontal-tb;
-  transform: rotate(180deg);
+  transform: none;
   background: var(--accent);
   color: var(--on-accent);
   border-radius: 9px;
@@ -4180,4 +4180,226 @@ body.menu-editing .sidebar span {
 }
 .thargoid-table tr.muted td {
   color: var(--muted);
+}
+
+/* EDCH BGS custom v1 — independent styles. */
+.bgs-panel {
+  margin: 14px 0;
+  padding: 16px;
+}
+.bgs-panel h2 {
+  margin-top: 0;
+}
+.bgs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.bgs-actions input[type="text"] {
+  min-width: 180px;
+  flex: 1 1 220px;
+}
+.bgs-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+.bgs-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 15px;
+}
+.bgs-stat strong {
+  font-size: 1.4rem;
+}
+.bgs-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.bgs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 880px;
+}
+.bgs-table td,
+.bgs-table th {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border, #333);
+  text-align: left;
+  vertical-align: top;
+}
+.bgs-table td:last-child {
+  min-width: 235px;
+}
+.bgs-table td:last-child button {
+  margin: 2px;
+}
+.bgs-import {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.bgs-import input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+@media (max-width: 760px) {
+  .bgs-panel {
+    padding: 10px;
+  }
+  .bgs-actions {
+    align-items: stretch;
+  }
+  .bgs-actions > * {
+    flex-grow: 1;
+  }
+}
+
+/* EDCH BGS v1.1 */
+.bgs-panel .bgs-error {
+  color: var(--error, #f77);
+}
+
+/* EDCH BGS v1.2 */
+.bgs-chart {
+  margin: 1rem 0;
+  max-width: 630px;
+}
+.bgs-sparkline {
+  width: 100%;
+  height: 90px;
+  min-height: 70px;
+  background: rgba(30, 80, 120, 0.1);
+  border-radius: 9px;
+}
+.bgs-route {
+  padding-left: 2rem;
+  max-height: 360px;
+  overflow: auto;
+}
+.bgs-route li {
+  padding: 5px 0;
+}
+.bgs-panel input[type="number"] {
+  width: 76px;
+  margin-inline: 7px;
+}
+.bgs-panel select {
+  max-width: 320px;
+}
+
+/* --- Correctif EDCH : onglet NOTIFICATIONS à l'endroit --- */
+.side-tab,
+.side-tab-label,
+.side-tab-text,
+.side-tab-badge {
+  transform: none !important;
+}
+
+.side-tab {
+  writing-mode: vertical-lr !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+.side-tab-label,
+.side-tab-text {
+  writing-mode: vertical-lr !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+.side-tab-badge {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+}
+
+/* EDCH-NOTIFICATIONS-V146-START */
+/* Glyphes droits, lus de haut en bas, même sur les anciennes versions de WebKitGTK. */
+.side-tab {
+  writing-mode: vertical-rl !important;
+  text-orientation: upright !important;
+  direction: ltr !important;
+  transform: none !important;
+}
+.side-tab-badge {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  transform: none !important;
+}
+/* EDCH-NOTIFICATIONS-V146-END */
+
+/* EDCH-NOTIFICATIONS-V147-START */
+/* Texte horizontal : évite le rendu inversé de WebKitGTK en mode vertical + rotation. */
+button.side-tab {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: normal !important;
+  transform: none !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px;
+  border-radius: 8px 0 0 8px;
+}
+button.side-tab > .side-tab-label {
+  display: inline-block !important;
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  transform: none !important;
+  white-space: nowrap !important;
+}
+button.side-tab > .side-tab-badge {
+  writing-mode: horizontal-tb !important;
+  direction: ltr !important;
+  unicode-bidi: isolate !important;
+  transform: none !important;
+}
+/* EDCH-NOTIFICATIONS-V147-END */
+
+/* EDCH-BGS-WORKSPACE-v1.5.1: four accessible BGS panels. */
+.bgs-workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+  border-bottom: 1px solid var(--border, #31383e);
+  padding-bottom: 10px;
+}
+.bgs-workspace-tabs [role="tab"] {
+  cursor: pointer;
+  padding: 9px 15px;
+  border-radius: 8px;
+}
+.bgs-workspace-tabs [aria-selected="true"] {
+  color: var(--accent, #e78a35);
+  border-color: currentColor;
+  font-weight: 700;
+}
+.bgs-workspace-pane[hidden] {
+  display: none !important;
+}
+.bgs-agent-table {
+  min-width: 600px;
+  font-size: 0.92rem;
+}
+.bgs-agent-table td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
 }

@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 // Spansh search API: turns a "where to find" rule into a Spansh query near the reference
 // system, runs it (with a short cache) and returns systems, bodies or stations with their distance.
 
@@ -263,28 +264,45 @@ function factionRow(r: any, q: FactionQuery): ResultRow {
  * where it is in one of `states`. Spansh filters on the faction's main state.
  */
 export async function searchFaction(q: FactionQuery, ref: Reference): Promise<FinderResult> {
-  const presence: Record<string, unknown> = { name: { value: [q.faction] } };
-  if (q.states.length) presence.state = { value: q.states };
-  const request = (filters: Record<string, unknown>, size: number) => ({
-    filters: { minor_faction_presences: [presence], ...filters },
-    sort: [{ distance: { direction: "asc" } }],
-    size,
-    page: 0,
-    ...reference(ref),
-  });
-  let data: any;
-  if (q.ownerOnly) {
-    try {
-      data = await spanshPost("systems/search", request({ controlling_minor_faction: { value: [q.faction] } }, 50));
-    } catch {
-      // Not every Spansh version filters on the controlling faction: filter the presences here.
-      data = await spanshPost("systems/search", request({}, 200));
+  // All pages, not only the 50 closest systems. Safety cap prevents runaway requests.
+  const size = 100;
+  const maxPages = 30;
+  const all = new Map<string, ResultRow>();
+  let reportedTotal = 0;
+  let complete = false;
+  for (let page = 0; page < maxPages; page++) {
+    const presence: Record<string, unknown> = { name: { value: [q.faction] } };
+    if (q.states.length) presence.state = { value: q.states };
+    const result = await spanshPost("systems/search", {
+      filters: { minor_faction_presences: [presence] },
+      sort: [{ distance: { direction: "asc" } }],
+      size,
+      page,
+      ...reference(ref),
+    });
+    const rows: any[] = Array.isArray(result?.results) ? result.results : [];
+    const count = Number(result?.count);
+    if (Number.isFinite(count) && count >= 0) reportedTotal = count;
+    const before = all.size;
+    for (const record of rows) {
+      if (q.ownerOnly && !controls(record, q.faction)) continue;
+      const row = factionRow(record, q);
+      all.set(String(record.id64 ?? row.system.toLowerCase()), row);
     }
-  } else data = await spanshPost("systems/search", request({}, 50));
-  let results: any[] = Array.isArray(data?.results) ? data.results : [];
-  if (q.ownerOnly) results = results.filter((r) => controls(r, q.faction));
-  const rows = results.map((r) => factionRow(r, q));
-  return { rows, total: q.ownerOnly ? rows.length : num(data?.count) || rows.length };
+    if (
+      !rows.length ||
+      (reportedTotal && (page + 1) * size >= reportedTotal) ||
+      (rows.length < size && !reportedTotal)
+    ) {
+      complete = true;
+      break;
+    }
+    // Do not loop forever on a Spansh API that ignores the page number.
+    if (all.size === before && !q.ownerOnly) break;
+  }
+  const rows = [...all.values()];
+  // For a truncated search, the reported count signals possible additional results.
+  return { rows, total: q.ownerOnly || complete ? rows.length : Math.max(reportedTotal, rows.length) };
 }
 
 export function distance(a?: Vec3, b?: Vec3 | null): number | undefined {

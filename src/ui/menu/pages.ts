@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 // The side menu: the pages, the order the player chose ("-" is a separating line), and About and
 // Settings, which are always shown and pinned at the bottom, outside the order the player edits.
 
@@ -13,6 +14,7 @@ export const NAV: { id: string; label: string; icon: string }[] = [
   },
   { id: "engineers", label: t("common.engineers"), icon: "M4 20h16M6 20V9l6-5 6 5v11M10 20v-6h4v6" },
   { id: "search", label: t("common.search2"), icon: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5L20 20" },
+  { id: "bgs", label: "BGS · Patrouilles", icon: "M4 19h16M4 15l4-5 4 3 4-7 4 5" },
   { id: "navigation", label: t("common.navigation"), icon: "M12 2l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" },
   { id: "-", label: "", icon: "" },
   { id: "missions", label: t("common.missions"), icon: "M9 4h6v3H9zM7 5H5v16h14V5h-2M8 11h8M8 15h6" },
@@ -67,6 +69,7 @@ export const DEFAULT_ORDER = [
   "missions",
   "navigation",
   "search",
+  "bgs",
   "-",
   "colonisation",
   "mining",

@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "EDCH — Elite Dangerous Companion Helper",
+        "title": "EDCH BGS v1.6.8.3 — Elite Dangerous Companion Helper (Manjaro)",
         "width": 1320,
         "height": 860,
         "minWidth": 960,
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://spansh.co.uk https://www.spansh.co.uk https://tick.edcd.io https://www.edsm.net https://edsm.net https://inara.cz https://ntfy.sh http://127.0.0.1:* http://localhost:*; frame-src 'none'; form-action 'self'"
     }
   },
   "bundle": {

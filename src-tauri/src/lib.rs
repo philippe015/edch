@@ -1,3 +1,4 @@
+// EDCH-BGS-v1.1
 //! EDCH backend.
 //!
 //! Deliberately small: the UI owns all game logic. The backend tails the Elite Dangerous journal
@@ -13,11 +14,19 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 mod app;
+mod bgs_db;
+mod agent_memory; // EDCH-COG-MEMORY-v1.5.3
+mod bgs_backup; // EDCH-BGS-RELIABILITY-v1.4.9
+mod bgs_pdf; // EDCH-BGS-PDF-v1.4.3
 mod http;
 mod journal;
 mod logs;
 mod ntfy;
 mod options;
+mod foot_binds; // EDCH-ONFOOT-EDIT-v1.4.4
+mod controls_preset; // EDCH-COMMANDES-JEU-v1.6.5
+mod hotas; // EDCH-HOTAS-STUDIO-v1.6.7
+mod report_html; // EDCH-REPORTS-HTML-v1.6.5
 mod paths;
 mod remote;
 mod system;
@@ -51,6 +60,20 @@ pub fn run() {
         .manage(Arc::new(journal::WatchState::default()))
         .manage(remote::RemoteState::default())
         .invoke_handler(tauri::generate_handler![
+            bgs_db::bgs_load,
+            agent_memory::agent_memory_add,
+            agent_memory::agent_memory_list,
+            agent_memory::agent_memory_delete,
+            // EDCH-COG-STABILISATION-v1.6.1
+            agent_memory::agent_memory_backup,
+            agent_memory::agent_memory_backups,
+            agent_memory::agent_memory_diagnostic,
+            agent_memory::agent_memory_restore,
+            bgs_db::bgs_save,
+            bgs_db::bgs_visit,
+            bgs_db::bgs_health,
+            bgs_backup::bgs_save_json,
+            bgs_pdf::bgs_save_pdf,
             journal::default_journal_dir,
             journal::scan_history,
             journal::start_journal,
@@ -62,6 +85,12 @@ pub fn run() {
             options::read_option_file,
             options::export_config,
             options::import_config,
+            foot_binds::foot_save_preset,
+            controls_preset::controls_save_preset,
+            controls_preset::controls_save_preset_batch,
+            hotas::hotas_devices,
+            hotas::hotas_capture,
+            report_html::save_html_report,
             system::reveal_path,
             system::installer_language,
             remote::remote_start,

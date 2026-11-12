@@ -6,7 +6,16 @@ import { massacreStacks } from "../../game/activity/missions.js";
 import { type Mission } from "../../game/activity/state.js";
 import { isRemote } from "../../platform/bridge.js";
 import { callout, fmt, h, icon, replace, toast } from "../../ui/dom.js";
-import { activeMissions, isShared, setShared, syncWing, wingView } from "../../features/missions/live.js";
+import {
+  activeMissions,
+  hasManualReceived,
+  isShared,
+  setManualReceived,
+  setShared,
+  syncWing,
+  wingView,
+} from "../../features/missions/live.js"; // EDCH-BGS-WING-RECEIPTS-v1.4.9.1
+import { wingScope } from "../../features/missions/wingManual.js";
 import { isActive, type LeaveReason, type WingMember } from "../../services/wing.js";
 import { newWingCode, type WingSettings } from "../../state/store.js";
 import { credits, hoursLeft, relTime } from "../../ui/format.js";
@@ -120,7 +129,7 @@ export class MissionsView implements View {
           h("p.sub", null, t("missions.activeMissionsWing", { count: missions.length, wingCount })),
         ),
       ),
-      callout("info", t("common.workProgress"), t("missions.notEveryFeatureFullyWorkingYet")),
+      callout("info", t("missions.wingTrackingTitle"), t("missions.notEveryFeatureFullyWorkingYet")),
       this.massacre(missions),
       this.list(missions),
       this.wing(),
@@ -498,6 +507,7 @@ export class MissionsView implements View {
             " " + t("missions.shareAllMyWingMissionsAutomatically"),
           ),
           h("p.sub", null, t("missions.otherwiseShareEachMissionShareWing")),
+          h("p.sub", null, t("missions.manualConfirmationHelp")),
         ),
       );
     }
@@ -546,6 +556,7 @@ export class MissionsView implements View {
                   h("th", null, t("common.destination")),
                   h("th", null, t("missions.expires")),
                   h("th", null, t("missions.accepted")),
+                  h("th", null, t("missions.manualAction")),
                 ),
               ),
               h(
@@ -594,8 +605,42 @@ export class MissionsView implements View {
                     h(
                       "td",
                       null,
-                      r.holders.map((id) => h("span.badge.ok", null, `✓ ${names.get(id) ?? "?"}`)),
+                      r.holders.map((id) =>
+                        h(
+                          "span.badge.ok",
+                          null,
+                          `✓ ${names.get(id) ?? "?"}`,
+                          (r.manualHolders ?? []).includes(id) ? ` (${t("missions.manualConfirmation")})` : "",
+                        ),
+                      ),
                       r.missing.map((id) => h("span.badge.muted", null, `✗ ${names.get(id) ?? "?"}`)),
+                    ),
+                    h(
+                      "td",
+                      null,
+                      !isRemote() && hasManualReceived(r.mission.id)
+                        ? h(
+                            "button.ghost.small",
+                            {
+                              onclick: () => {
+                                if (!setManualReceived(r.mission.id, false)) toast(t("missions.manualError"));
+                                this.render();
+                              },
+                            },
+                            t("missions.undoManualConfirmation"),
+                          )
+                        : !isRemote() && !r.mine && r.missing.includes(view.me.id)
+                          ? h(
+                              "button.ghost.small",
+                              {
+                                onclick: () => {
+                                  if (!setManualReceived(r.mission.id, true)) toast(t("missions.manualError"));
+                                  this.render();
+                                },
+                              },
+                              t("missions.confirmReceivedMission"),
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -605,6 +650,38 @@ export class MissionsView implements View {
       );
     } else if (s.enabled && !isRemote()) {
       parts.push(h("p.sub", null, t("missions.enterCreateCodeLeast8Characters")));
+    }
+    if (!isRemote() && s.enabled) {
+      const scope = wingScope(s.code);
+      const pending = (s.manualReceived ?? []).filter(
+        (receipt) => receipt.code === scope && !view?.rows.some((row) => row.mission.id === receipt.id),
+      );
+      if (pending.length) {
+        parts.push(
+          h(
+            "div.wing-manual-offline",
+            null,
+            h("p.sub", null, t("missions.savedOfflineConfirmations")),
+            pending.slice(0, 20).map((receipt) =>
+              h(
+                "div.row",
+                null,
+                h("span.sub", null, `#${receipt.id}`),
+                h(
+                  "button.ghost.small",
+                  {
+                    onclick: () => {
+                      setManualReceived(receipt.id, false);
+                      this.render();
+                    },
+                  },
+                  t("missions.undoManualConfirmation"),
+                ),
+              ),
+            ),
+          ),
+        );
+      }
     }
     return h("section.card.wing", null, parts);
   }

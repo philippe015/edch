@@ -1,15 +1,8 @@
+import { localizedActionLabel, localizedComboLabel, localizedKeyLabel } from "../../features/controls/actionLabels.js";
 // Drawings of a device's bindings: action chips, the gamepad picture, and the generic board
 // (axes, hats, buttons) used for joysticks and mice without an EDRefCard template.
 
-import {
-  actionName,
-  type Bind,
-  type BindsMeta,
-  comboLabel,
-  groupOf,
-  keyLabel,
-  padControl,
-} from "../../features/controls/binds.js";
+import { type Bind, type BindsMeta, groupOf, padControl } from "../../features/controls/binds.js";
 import { t } from "../../platform/i18n.js";
 import { h } from "../../ui/dom.js";
 
@@ -33,14 +26,14 @@ export const groupClass = (g: string) => `g-${g.toLowerCase().replace(/[^a-z]/g,
 export function chips(meta: BindsMeta, list: Bind[]): HTMLElement[] {
   return list.map((b) => {
     const g = groupOf(meta, b.action);
-    const mod = b.modifiers.length ? `${b.modifiers.map((m) => keyLabel(meta, m.key)).join(" + ")} + ` : "";
+    const mod = b.modifiers.length ? `${b.modifiers.map((m) => localizedKeyLabel(meta, m.key)).join(" + ")} + ` : "";
     return h(
       `span.act.${groupClass(g)}`,
       {
         title: `${GROUP_LABELS[g] ?? g} · ${b.action}${b.slot === "secondary" ? ` (${t("controls.secondary")})` : ""}`,
       },
       mod ? h("em", null, mod) : null,
-      actionName(meta, b.action),
+      localizedActionLabel(meta, b.action),
       b.inverted ? h("small", null, " " + t("controls.inverted")) : null,
     );
   });
@@ -49,7 +42,7 @@ export function chips(meta: BindsMeta, list: Bind[]): HTMLElement[] {
 export function legendTable(meta: BindsMeta, binds: Bind[]): HTMLElement {
   const byCombo = new Map<string, Bind[]>();
   for (const b of binds) {
-    const k = comboLabel(meta, b);
+    const k = localizedComboLabel(meta, b);
     byCombo.set(k, [...(byCombo.get(k) ?? []), b]);
   }
   const rows = [...byCombo.entries()].sort(([a], [b]) => a.localeCompare(b, "fr", { numeric: true }));
@@ -247,7 +240,7 @@ export function board(meta: BindsMeta, legendKey: () => HTMLElement, binds: Bind
                 h(
                   "div.axis-row",
                   null,
-                  h("span.axis-name", null, keyLabel(meta, k)),
+                  h("span.axis-name", null, localizedKeyLabel(meta, k)),
                   h("span.axis-bar", null, h("span")),
                   h("div.acts", null, chips(meta, list)),
                 ),
@@ -295,9 +288,13 @@ export function board(meta: BindsMeta, legendKey: () => HTMLElement, binds: Bind
           h(
             "div.btn-grid",
             null,
-            [...buttons.entries()].sort(([a], [b]) => n(a) - n(b)).map(([k, list]) => tile(keyLabel(meta, k), list)),
+            [...buttons.entries()]
+              .sort(([a], [b]) => n(a) - n(b))
+              .map(([k, list]) => tile(localizedKeyLabel(meta, k), list)),
           ),
         )
       : null,
   );
 }
+
+// EDCH-BINDS-FR-v1.3.1 — traduction des commandes et des touches.

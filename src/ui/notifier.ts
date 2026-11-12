@@ -151,6 +151,30 @@ export function setTabLabel(text: string) {
   if (span) span.textContent = label;
 }
 
+/** EDCH-NOTIFICATIONS-V148: neutralize legacy CSS rotations in the actual WebKitGTK DOM. */
+function forceReadableSideTab() {
+  if (!tab) return;
+  const orient = (element: HTMLElement) => {
+    element.setAttribute("dir", "ltr");
+    element.style.setProperty("direction", "ltr", "important");
+    element.style.setProperty("writing-mode", "horizontal-tb", "important");
+    element.style.setProperty("text-orientation", "mixed", "important");
+    element.style.setProperty("transform", "none", "important");
+    element.style.setProperty("unicode-bidi", "isolate", "important");
+  };
+  orient(tab);
+  tab.style.setProperty("flex-direction", "row", "important");
+  // Never force display: the [hidden] / focus-mode rules must keep working.
+  const label = tab.querySelector<HTMLElement>(".side-tab-label");
+  if (label) {
+    orient(label);
+    label.style.setProperty("white-space", "nowrap", "important");
+  }
+  const counter = tab.querySelector<HTMLElement>(".side-tab-badge");
+  if (counter) orient(counter);
+  tab.dataset.edchNotificationsFix = "v148";
+}
+
 /** Mounts the side tab once; `render` builds the panel's content each time it opens or refreshes. */
 export function mountSideTab(s: Store, render: () => (Node | null)[]) {
   store = s;
@@ -164,6 +188,7 @@ export function mountSideTab(s: Store, render: () => (Node | null)[]) {
   );
   panel = h("div.side-panel", { onclick: (e: Event) => e.stopPropagation() });
   document.body.append(tab, panel);
+  forceReadableSideTab();
   document.addEventListener("click", close);
   document.addEventListener("keydown", (e) => e.key === "Escape" && close());
   refresh();

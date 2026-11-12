@@ -1,3 +1,4 @@
+// EDCH-BGS-v1.1
 // Journal feed (PC): starts reading the game's journal and applies what arrives to the store:
 // journal lines, the journal's status, and the companion files (Status, Market, Cargo,
 // ShipLocker). Live events also go to the data sharing services and to the live features.
@@ -12,6 +13,11 @@ import type { Store } from "../state/store.js";
 import { clearAlert, goTo, inStartup, startupAlert } from "../ui/alerts.js";
 import type { Uploaders } from "../services/sync/index.js";
 import { loadHistory, onLiveEvents } from "../features/missions/live.js";
+import { recordLiveArrivals } from "../features/bgs/live.js";
+import { resetCommanderJournalContext } from "../features/bgs/commander.js";
+import { startBgsTickMonitor } from "../features/bgs/monitor.js";
+// EDCH-COG-AGENT-JOURNAL-v1.5.0
+import { enqueueAgentEvents } from "../features/agent/runtime.js";
 
 /** Material capacity by id (from the game data), for the journal's material events. */
 type CapacityOf = (id: string) => number | undefined;
@@ -20,6 +26,7 @@ let replaying = true;
 
 /** Rebuilds the commander's state from the journal (start-up, or after a folder change). */
 export function replayJournal(store: Store) {
+  resetCommanderJournalContext();
   store.state.cmdr = emptyState();
   replaying = true;
   store.notify();
@@ -65,11 +72,16 @@ export async function startJournalFeed(store: Store, sync: Uploaders, capacityOf
   let saveTimer: number | undefined;
   let uploads = Promise.resolve();
   sync.start();
+  startBgsTickMonitor();
   await onJournal({
     batch: (b) => {
       const { changed, events } = applyLines(store.state.cmdr, b.lines, capacityOf);
+      // Time-ordered journal correlation: historical batches repair saved rows only.
+      recordLiveArrivals(events, store.state.cmdr.commander, Boolean(b.replay));
       if (!b.replay) {
+        // Never count replayed historical journals as fresh BGS patrol visits.
         onLiveEvents(events);
+        enqueueAgentEvents(events); // live events only; no replay, no raw I/O
         if (log.debugOn && events.length) {
           log.debug("journal", `Events: ${events.map((e) => e.event).join(", ")}`);
           for (const e of events) {

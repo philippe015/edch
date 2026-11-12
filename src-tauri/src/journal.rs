@@ -1,3 +1,4 @@
+// EDCH-BGS-CUSTOM-v1
 //! The game's journal: finds the journal folder, replays the latest journals at start-up, then
 //! follows the newest one and streams its lines to the UI ("journal-batch" events). Also watches
 //! the companion files the game rewrites (Status.json, Cargo.json…, "aux-file" events) and reads
@@ -172,7 +173,9 @@ fn check_aux(app: &AppHandle, dir: &Path, seen: &mut [Option<SystemTime>; 5]) {
         if let Ok(bytes) = fs::read(&path) {
             let content = String::from_utf8_lossy(&bytes).to_string();
             // The game sometimes leaves the file empty for a moment while rewriting it.
-            if content.trim().is_empty() {
+            if content.trim().is_empty() || serde_json::from_slice::<serde_json::Value>(&bytes).is_err() {
+                // The game can rewrite a companion JSON file in multiple writes.
+                // Do not mark its mtime as seen until valid JSON arrives.
                 continue;
             }
             seen[index] = Some(modified);

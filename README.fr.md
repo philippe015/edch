@@ -1,5 +1,7 @@
 # EDCH — Elite Dangerous Companion Helper
 
+> **Version communautaire EDCH BGS Manjaro v1.6.8.3 — Cyberpunk Philou** : développements BGS, HOTAS X52 Pro, français et Odyssey. [Guide de la version complète](README_BGS_MANJARO.md). Cette branche conserve l'application originale et ses crédits ; elle ne constitue pas une version officielle de BKNadir.
+
 [English](README.md) · **Français** · [Deutsch](README.de.md) · [Español](README.es.md) · [Português (Brasil)](README.pt-BR.md) · [Русский](README.ru.md) · [Code signing policy (politique de signature)](CODE_SIGNING_POLICY.md)
 
 Compagnon léger pour **Elite Dangerous** (Windows). Il lit le journal du jeu en temps réel et, pour chaque matériau d'ingénierie, te dit **où le trouver, avec de vrais systèmes cliquables autour de toi**.
