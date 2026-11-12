@@ -67,9 +67,10 @@ function validRecord(value: unknown): value is CombatZoneRecord {
     validKind(item.kind) &&
     validGrade(item.grade) &&
     validOutcome(item.outcome) &&
+    typeof item.count === "number" &&
     Number.isSafeInteger(item.count) &&
-    (item.count as number) >= 1 &&
-    (item.count as number) <= 50 &&
+    item.count >= 1 &&
+    item.count <= 50 &&
     item.source === "manual";
 }
 
