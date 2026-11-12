@@ -9,7 +9,7 @@ import { showChangelog } from "../../ui/changelog.js";
 import type { Ctx, View } from "../../state/context.js";
 import { t } from "../../platform/i18n.js";
 
-const REPO = "https://github.com/BKNadir/edch";
+const REPO = "https://github.com/philippe015/edch";
 
 /** The projects EDCH relies on: name, what they bring, links (site first, then repository). */
 const PROJECTS: { name: string; what: string; links: [string, string][] }[] = [
@@ -133,7 +133,7 @@ export class AboutView implements View {
         h(
           "section.card",
           null,
-          h("h3", null, "EDCH — Elite Dangerous Companion Helper"),
+          h("h3", null, "Cyberpunk Philou — EDCH BGS"),
           h("p", null, t("about.lightweightCompanionEliteDangerousLiveInventory")),
         ),
         h(
@@ -163,7 +163,7 @@ export class AboutView implements View {
           h(
             "ul.about-links",
             null,
-            h("li", null, "📦 ", h("span", null, t("about.sourceCode")), " ", link("github.com/BKNadir/edch", REPO)),
+            h("li", null, "📦 ", h("span", null, t("about.sourceCode")), " ", link("github.com/philippe015/edch", REPO)),
             h(
               "li",
               null,
