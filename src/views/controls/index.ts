@@ -353,7 +353,7 @@ export class ControlsView implements View {
       ),
       this.note ? h("p.notice", null, icon("warn"), ` ${this.note}`) : null,
       h("p.sub", null, "Configuration par contexte : Vaisseau, SRV / VRS ou À pied. Choisis ensuite Clavier AZERTY, HOTAS ou Manette Xbox et un profil conseillé."),
-      this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings(), this.mode),
+      this.presetEditor.render(meta, this.files, this.chosen || fileForPreset(this.presets[this.mode==="ship"?1:this.mode==="srv"?2:3] ?? "", this.files.map(f=>f.name)) || "", async () => this.refreshBindings(), this.mode),
       // EDCH-ONFOOT-EDIT-v1.4.4: edit and save a separate Odyssey keyboard-only preset.
       this.mode === "foot"
         ? this.onFootEditor.render(
