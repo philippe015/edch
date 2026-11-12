@@ -275,6 +275,33 @@ const invoke = <T>(cmd: string, args?: Record<string, unknown>) => {
   return tauriInvoke<T>(cmd, args);
 };
 
+/** EDCH Cyberpunk Philou v1.6.11: local, read-only storage inventory. */
+export interface StorageEntry {
+  id: string;
+  label: string;
+  path: string;
+  bytes: number;
+  files: number;
+  exists: boolean;
+  incomplete: boolean;
+}
+export interface DataFileState {
+  id: string;
+  name: string;
+  exists: boolean;
+  bytes: number;
+  modifiedUnix: number | null;
+}
+export interface StorageDiagnostic {
+  entries: StorageEntry[];
+  dataFiles: DataFileState[];
+  agentBackups: number;
+  latestAgentBackupUnix: number | null;
+  checkedUnix: number;
+}
+export const storageDiagnostic = (): Promise<StorageDiagnostic> => invoke<StorageDiagnostic>("storage_diagnostic");
+export const storageBgsIntegrity = (): Promise<string> => invoke<string>("storage_bgs_integrity");
+
 export const optionsDir = () => invoke<string>("options_dir");
 export const listOptionFiles = (): Promise<OptionFile[]> =>
   remote ? remoteJson("/api/options") : invoke<OptionFile[]>("list_option_files");

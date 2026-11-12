@@ -1,0 +1,19 @@
+/* EDCH Cyberpunk Philou v1.6.11 — read-only storage diagnostic in Settings / Advanced. */
+.edch-storage-v1611 .edch-storage-total{margin:14px 0 6px;font-size:1.15rem}
+.edch-storage-v1611 .edch-storage-total strong{color:var(--accent,#ff9b38)}
+.edch-storage-rows{display:grid;gap:8px;margin:14px 0 18px}
+.edch-storage-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #41515e;background:#151e29;border-radius:7px}
+.edch-storage-info{display:grid;gap:4px;min-width:0;flex:1}
+.edch-storage-info strong{color:#f0f3f7;font-size:.9rem}
+.edch-storage-info code{color:#b3c9d9;overflow-wrap:anywhere;font-size:.77rem;white-space:normal}
+.edch-storage-info small{color:#aab6c5}
+.edch-storage-amount{display:grid;gap:8px;justify-items:end;text-align:end}
+.edch-storage-amount strong{color:#ffbf7c;white-space:nowrap}
+.edch-storage-v1611 button:focus-visible{outline:2px solid #ff9e3a;outline-offset:3px}
+.edch-storage-datafiles{display:grid;gap:8px;margin:10px 0}
+.edch-storage-data{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;border-bottom:1px solid #40505a;padding:8px 0}
+.edch-storage-data strong{min-width:180px}
+.edch-storage-data span{color:#c8e3da}
+.edch-storage-data small{color:#acbbcb}
+@media(max-width:720px){.edch-storage-row{flex-direction:column;align-items:stretch}.edch-storage-amount{display:flex;justify-content:space-between;align-items:center}}
+@media print{.edch-storage-amount button,.edch-storage-v1611 .row button{display:none!important}}

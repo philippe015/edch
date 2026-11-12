@@ -1,0 +1,64 @@
+name: EDCH Cyberpunk Philou — Stockage v1.6.11
+
+on:
+  push:
+    branches:
+      - 'feat/cyberpunk-philou-diagnostic-stockage-v1.6.11-*'
+  pull_request:
+    paths:
+      - 'src-tauri/src/storage_diagnostic.rs'
+      - 'src-tauri/src/lib.rs'
+      - 'src/features/storage/**'
+      - 'src/views/settings/**'
+      - 'src/platform/bridge.ts'
+      - 'public/storage-diagnostic.css'
+      - 'public/index.html'
+      - 'test/storage-diagnostic-v1611.test.mjs'
+      - '.github/workflows/edch-storage-v1611.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edch-storage-v1611-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typescript-and-js:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-package-lock
+      - name: Compile frontend
+        run: npm run build
+      - name: Storage and regression tests
+        run: node --test test/*.test.mjs
+  rust-read-only-diagnostic:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tauri Linux requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libgtk-3-dev libsoup-3.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build required Tauri frontend before Rust tests
+        run: |
+          npm install --no-package-lock
+          npm run build
+      - name: Run native tests including read-only filesystem tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Check native build
+        run: cargo check --manifest-path src-tauri/Cargo.toml
