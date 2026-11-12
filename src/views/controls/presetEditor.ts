@@ -6,7 +6,7 @@ import { localizedActionLabel} from "../../features/controls/actionLabels.js";
 import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
-  recommendProfile, type PresetAssignment, type SuggestedProfile,
+  type PresetAssignment, type SuggestedProfile,
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
 import {
@@ -53,7 +53,7 @@ export class ControlsPresetEditor {
 
   hasDraft():boolean { return this.staged.length>0; }
 
-  render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>, scope:GameScope="ship"):HTMLElement {
+  render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>, scope:GameScope=this.mode):HTMLElement {
     this.context={meta,files,active,reload};
     if(this.mode!==scope){this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;this.editAction="";this.message="";}
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
@@ -171,10 +171,10 @@ export class ControlsPresetEditor {
       if (!src) return;
       const style: SuggestedProfile = modeId===1 ? "navigation" : modeId===2 ? "combat" : "exploration";
       this.profile=style;
-      const advice=recommendProfile(style,src.actions,src.binds,meta);
+      const advice=recommendScopedProfile("ship","hotas",style,src.actions,src.binds,meta);
       if (advice.changes.length) this.stageAdvice(advice);
       else {
-        this.message=`Mode ${modeId} — ${advice.name} : aucune attribution sûre à ajouter automatiquement. Les commandes existantes sont conservées ; tu peux les modifier avec P/S.`;
+        this.message=`Mode ${modeId} — ${style} : aucune attribution HOTAS vérifiable à ajouter automatiquement. Les commandes existantes sont conservées ; tu peux les modifier avec P/S.`;
         this.repaint();
       }
     }) : null;
