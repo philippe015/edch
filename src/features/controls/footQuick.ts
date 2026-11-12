@@ -4,16 +4,17 @@
 import { type Bind, type BindsMeta } from "./binds.js";
 import { footActions, type FootChange } from "./footEdit.js";
 
-export type FootQuickCategory = "essential" | "movement" | "combat" | "equipment" | "other";
+export type FootQuickCategory = "essential" | "all" | "movement" | "combat" | "equipment" | "other";
 export const FOOT_CATEGORIES: { id: FootQuickCategory; label: string }[] = [
   { id: "essential", label: "Essentielles" },
+  { id: "all", label: "Toutes les commandes" },
   { id: "movement", label: "Déplacement" },
   { id: "combat", label: "Combat" },
   { id: "equipment", label: "Équipement" },
   { id: "other", label: "Autres" },
 ];
 
-const GROUPS: { id: Exclude<FootQuickCategory, "essential">; label: string; actions: string[] }[] = [
+const GROUPS: { id: Exclude<FootQuickCategory, "essential" | "all">; label: string; actions: string[] }[] = [
   {
     id: "movement",
     label: "Déplacement",
@@ -55,7 +56,7 @@ const ESSENTIAL = [
   "HumanoidItemWheelButton", "HumanoidToggleShieldsButton",
 ];
 
-export function footQuickGroup(action: string): Exclude<FootQuickCategory, "essential"> {
+export function footQuickGroup(action: string): Exclude<FootQuickCategory, "essential" | "all"> {
   return GROUPS.find((group) => group.actions.includes(action))?.id ?? "other";
 }
 
@@ -63,7 +64,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g,
 
 export interface FootQuickAction {
   action: string;
-  category: Exclude<FootQuickCategory, "essential">;
+  category: Exclude<FootQuickCategory, "essential" | "all">;
   label: string;
 }
 
@@ -77,8 +78,7 @@ export function footQuickActions(
   const term = fold(query.slice(0, 120));
   const actions = category === "essential"
     ? ESSENTIAL.filter((action) => allowed.has(action))
-    : [...allowed].filter((action) => category === "other" || footQuickGroup(action) === category)
-      .filter((action) => category !== "other" || footQuickGroup(action) === "other");
+    : [...allowed].filter((action) => category === "all" || footQuickGroup(action) === category);
   return actions
     .map((action) => ({ action, category: footQuickGroup(action), label: label(action) }))
     .filter((row) => !term || fold(row.label).includes(term) || fold(row.action).includes(term))
