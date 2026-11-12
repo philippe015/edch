@@ -9,16 +9,16 @@ import {
   recommendProfile, type ControlTab, type PresetAssignment, type SuggestedProfile,
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
+import {
+  detectedInputs, GAME_SCOPES, INPUT_FAMILIES, recommendScopedProfile, USAGE_STYLES,
+  type GameScope, type InputFamily,
+} from "../../features/controls/scopedProfiles.js";
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 
-interface SourceState { filename: string; actions: string[]; binds: Bind[] }
+interface SourceState { filename: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
-const MODES: { id: ControlTab; title: string }[] = [
-  { id:"all",title:"Tout" },{ id:"ship",title:"Vaisseau" },{ id:"srv",title:"VRS" },
-  { id:"foot",title:"À pied" },{ id:"ui",title:"Interface / cartes" },
-];
-const PROFILES: SuggestedProfile[]=["balanced","navigation","combat","exploration"];
+// Trois contextes principaux : l'interface et les cartes sont dans les outils avancés.
 export function actionsFromXml(xml: string): string[] {
   const root=parseXml(xml).children.find(node=>node.tag==="Root");
   if (!root) return [];
@@ -36,7 +36,8 @@ export class ControlsPresetEditor {
   private loading=false;
   private saving=false;
   private message="";
-  private mode:ControlTab="ship";
+  private mode:GameScope="ship";
+  private family:InputFamily="azerty";
   private query="";
   private profile:SuggestedProfile="balanced";
   private editAction="";
@@ -50,8 +51,11 @@ export class ControlsPresetEditor {
   private host?:HTMLElement;
   private context?:{meta:BindsMeta;files:OptionFile[];active:string;reload:()=>Promise<void>};
 
-  render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>):HTMLElement {
+  hasDraft():boolean { return this.staged.length>0; }
+
+  render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>, scope:GameScope="ship"):HTMLElement {
     this.context={meta,files,active,reload};
+    if(this.mode!==scope){this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;this.editAction="";this.message="";}
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
       .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
@@ -60,10 +64,11 @@ export class ControlsPresetEditor {
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
     const src=this.source?.filename===this.selected?this.source:undefined;
-    const inputs=src?inputCatalog(src.binds):[];
+    const inputs=src?detectedInputs(src.binds,this.family,meta):[];
+    const deviceAdvice=src?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
     const rows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
     if (src && this.editAction && !src.actions.includes(this.editAction)) this.editAction="";
-    if (inputs.length && !inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=bindingKey(inputs[0]);
+    if (!inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=inputs.length?bindingKey(inputs[0]):"";
     const editsWarnings=src?occupancyWarnings(src.binds,this.staged,meta):[];
     const canSave=Boolean(src && this.staged.length && this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
       && (!editsWarnings.length || this.acknowledgeWarnings) && isTauri() && !isRemote() && !this.loading && !this.saving);
@@ -77,13 +82,18 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes PRO · v1.6.6"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes · configuration simplifiée v1.6.10"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
-    const topTabs=h("div.edch-c166-tabs",{role:"tablist","aria-label":"Catégories de commandes"},...MODES.map(x=>
-      h("button",{type:"button",role:"tab","aria-selected":this.mode===x.id,class:this.mode===x.id?"active":"",
-        onclick:()=>{this.mode=x.id;this.repaint();}},x.title)));
+    const topTabs=h("div.edch-c166-tabs",{role:"tablist","aria-label":"Périphériques"},...INPUT_FAMILIES.map(x=>
+      h("button",{type:"button",role:"tab","aria-selected":this.family===x.id,class:this.family===x.id?"active":"",
+        onclick:()=>{
+          if(this.family===x.id)return;
+          if(this.staged.length&&!window.confirm("Changer de périphérique et abandonner le brouillon non enregistré ?"))return;
+          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";
+          this.repaint();
+        }},x.label)));
     const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
       placeholder:"Rechercher une commande française ou son identifiant…",oninput:(e:Event)=>{
         this.query=(e.target as HTMLInputElement).value;this.repaint("search");
@@ -102,8 +112,14 @@ export class ControlsPresetEditor {
     ),
     rows.length>200?h("p.edch-c166-muted",null,`200 sur ${rows.length} commandes affichées : affine la recherche.`):null,
     !rows.length?h("p.edch-c166-muted",null,"Aucune commande pour cette recherche."):null);
-    const rowPane=h("section.edch-c166-pane.edch-c166-list",null,h("div.edch-c166-section-title",null,h("h4",null,"Commandes du jeu"),
-      h("span",null,`${rows.length} résultat(s)`)),topTabs,search,table);
+    const currentContext=GAME_SCOPES.find(x=>x.id===this.mode)!;
+    const rowPane=h("section.edch-c166-pane.edch-c166-list",null,
+      h("div.edch-c166-section-title",null,h("h4",null,currentContext.label),
+        h("span",null,`${rows.length} commande(s)`)),
+      h("p.edch-c166-muted",null,currentContext.description),
+      h("h4",null,"Choisir le périphérique"),topTabs,
+      h("p.edch-c166-muted",null,`${inputs.length} entrée(s) de ce type réellement présentes dans le fichier source.`),
+      search,table);
     const chooseInput=h("select",{value:this.editInput,disabled:this.saving||!src,
       onchange:(e:Event)=>{this.editInput=(e.target as HTMLSelectElement).value;this.repaint();}},...inputs.map(i=>choose(readKey(i),bindingKey(i),this.editInput===bindingKey(i))));
     const editBox=h("section.edch-c166-pane",null,
@@ -111,24 +127,22 @@ export class ControlsPresetEditor {
       selectedAction ? h("div",null,
         h("p.edch-c166-keyname",null,localizedActionLabel(meta,selectedAction)),
         h("p.edch-c166-muted",null,`${labelSlot(this.editSlot)} · actuelle : ${readKey(old)}`),
-        h("label.edch-c166-field",null,"Nouveau bouton ou touche reconnu",chooseInput),
+        h("label.edch-c166-field",null,`Bouton reconnu — ${INPUT_FAMILIES.find(x=>x.id===this.family)!.label}`,chooseInput),
         old?h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.replace,onchange:(e:Event)=>{
           this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
         btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
       ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
-    const suggestions=src?PROFILES.map(p=>recommendProfile(p,src.actions,src.binds,meta)):[];
-    const selectedAdvice=suggestions.find(x=>x.kind===this.profile);
     const adviceBox=h("section.edch-c166-pane",null,
-      h("h4",null,"Profils intelligents proposés"),
-      h("p.edch-c166-muted",null,"Suggestions calculées hors ligne d'après les commandes réellement présentes. Aucune touche n'est inventée."),
-      h("label.edch-c166-field",null,"Style d'utilisation",h("select",{value:this.profile,disabled:this.loading||this.saving,
+      h("h4",null,"Profils intelligents · "+INPUT_FAMILIES.find(x=>x.id===this.family)!.label),
+      h("p.edch-c166-muted",null,"Suggestions locales et vérifiables pour "+currentContext.label+". Aucun numéro HOTAS ou Xbox n'est inventé."),
+      h("label.edch-c166-field",null,"Profil conseillé",h("select",{value:this.profile,disabled:this.loading||this.saving,
         onchange:(e:Event)=>{this.profile=(e.target as HTMLSelectElement).value as SuggestedProfile;this.repaint();}},
-        ...suggestions.map(x=>choose(x.name,x.kind,x.kind===this.profile)))),
-      selectedAdvice?h("p.edch-c166-muted",null,selectedAdvice.description):null,
-      selectedAdvice?h("p",null,`${selectedAdvice.covered}/${selectedAdvice.relevant} commandes ciblées déjà attribuées · ${selectedAdvice.changes.length} proposition(s) prudente(s).`):null,
-      selectedAdvice && !selectedAdvice.changes.length?h("p.edch-c166-muted",null,selectedAdvice.warnings[0]):null,
-      btn("Préparer les suggestions",()=>this.stageAdvice(selectedAdvice),!selectedAdvice?.changes.length||this.loading||this.saving,"primary"),
-      h("p.edch-c166-muted",null,"Les propositions ne remplissent que les commandes libres, avec une touche connue, cohérente avec l’action et non utilisée dans le même contexte. Aucune attribution aléatoire."));
+        ...USAGE_STYLES.map(x=>choose(x.label,x.id,x.id===this.profile)))),
+      deviceAdvice?h("p",null,`${deviceAdvice.covered}/${deviceAdvice.relevant} commande(s) déjà configurée(s) sur ce périphérique · ${deviceAdvice.changes.length} proposition(s) sûre(s).`):null,
+      deviceAdvice?.absent.length?h("p.edch-c166-muted",null,`${deviceAdvice.absent.length} action(s) inexistante(s) dans ce .binds : ignorées.`):null,
+      ... (deviceAdvice?.warnings ?? []).map(w=>h("p.edch-c166-muted",null,w)),
+      btn("Préparer les suggestions",()=>this.stageAdvice(deviceAdvice),!deviceAdvice?.changes.length||this.loading||this.saving,"primary"),
+      h("p.edch-c166-muted",null,"Le brouillon ne modifie aucun fichier. Les touches occupées et les axes analogiques sont préservés."));
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
         h("span",null,h("strong",null,localizedActionLabel(meta,change.action)),
@@ -145,14 +159,14 @@ export class ControlsPresetEditor {
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
       h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer le profil ; sélectionne ensuite EDCHPro dans les préréglages du jeu (Général, Vaisseau, VRS et À pied selon la catégorie)."));
-    const hotas = this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
+    const hotas = this.family==="hotas" && this.mode==="ship" ? this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
       const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
       if (!input) return;
       this.editInput = bindingKey(input);
       this.message = `HOTAS : ${candidate.device} ${candidate.key} sélectionné. Choisis une commande, puis ajoute au brouillon.`;
       this.repaint();
-    });
-    const modeProfiles=this.x52Modes.render(meta,src?.actions ?? [],src?.binds ?? [],this.selected,(modeId) => {
+    }) : null;
+    const modeProfiles=this.family==="hotas" && this.mode==="ship" ? this.x52Modes.render(meta,src?.actions ?? [],src?.binds ?? [],this.selected,(modeId) => {
       if (!src) return;
       const style: SuggestedProfile = modeId===1 ? "navigation" : modeId===2 ? "combat" : "exploration";
       this.profile=style;
@@ -162,9 +176,19 @@ export class ControlsPresetEditor {
         this.message=`Mode ${modeId} — ${advice.name} : aucune attribution sûre à ajouter automatiquement. Les commandes existantes sont conservées ; tu peux les modifier avec P/S.`;
         this.repaint();
       }
-    });
-    const right=h("div.edch-c166-right",null,hotas,editBox,adviceBox,draftBox);
+    }) : null;
+    const right=h("div.edch-c166-right",null,
+      hotas,
+      this.family==="xbox" ? h("p.edch-c166-muted",null,
+        "Xbox : les boutons doivent d'abord être reconnus et enregistrés dans le jeu. EDCH ne déduit pas la numérotation de Proton.") : null,
+      this.family==="hotas" ? h("p.edch-c166-muted",null,
+        "HOTAS : profils X52 Pro/X56 selon les affectations observées. Les numéros Linux ne sont pas des boutons Elite vérifiés.") : null,
+      editBox,adviceBox,draftBox);
     this.host=h("section.card.edch-controls-write-v166",null,heading,
+      h("p.edch-c166-muted",{style:{padding:"0 16px"}},
+        "Onglet : "+currentContext.label+" · Interface / cartes et diagnostics complémentaires dans les outils avancés."), 
+      src && this.family==="azerty" && !/^(fr|nl-BE)(-|$)/i.test(src.keyboardLayout)
+        ? h("p.edch-c166-warning",null,"Le jeu indique le clavier "+src.keyboardLayout+". Vérifie AZERTY avant de valider.") : null,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       h("div.edch-c166-layout",null,rowPane,right),
       modeProfiles,
@@ -184,7 +208,7 @@ export class ControlsPresetEditor {
       const xml=await readOptionFile("Bindings",name);
       if(gen!==this.generation||name!==this.selected)return;
       const parsed=parseBinds(xml);
-      this.source={filename:name,binds:parsed.binds,actions:actionsFromXml(xml)};
+      this.source={filename:name,binds:parsed.binds,actions:actionsFromXml(xml),keyboardLayout:parsed.keyboardLayout};
       this.message="";
     } catch(e){if(gen===this.generation)this.message=`Lecture impossible : ${String(e)}`;}
     finally{if(gen===this.generation){this.loading=false;this.repaint();}}
@@ -199,7 +223,7 @@ export class ControlsPresetEditor {
     this.staged=this.staged.filter(x=>x.action!==next.action||x.slot!==next.slot).concat(next);
     this.acknowledgeWarnings=false;this.message="";this.repaint();
   }
-  private stageAdvice(advice:ReturnType<typeof recommendProfile>|undefined){
+  private stageAdvice(advice:{changes:PresetAssignment[]}|undefined){
     if(!advice?.changes.length)return;
     if(this.staged.length&&!window.confirm("Remplacer le brouillon par les suggestions ? Le profil du jeu ne sera pas modifié."))return;
     this.staged=advice.changes.map(c=>({...c,modifiers:c.modifiers.map(m=>({...m}))}));
