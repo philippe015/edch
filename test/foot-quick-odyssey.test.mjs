@@ -14,16 +14,18 @@ const label = (action) => ({
 })[action] ?? meta.controls[action]?.n ?? action;
 
 test("Odyssey quick categories come from the real bindings catalog", () => {
-  assert.equal(FOOT_CATEGORIES.length, 5);
+  assert.equal(FOOT_CATEGORIES.length, 6);
   const essential = footQuickActions(meta, "essential", "", label);
   assert.ok(essential.some((entry) => entry.action === "HumanoidJumpButton"));
   assert.ok(essential.some((entry) => entry.action === "HumanoidPrimaryInteractButton"));
   assert.ok(!essential.some((entry) => entry.action === "YawLeftButton"));
   assert.equal(footQuickGroup("HumanoidReloadButton"), "combat");
+  assert.ok(footQuickActions(meta, "all", "", label).length >= 50);
 });
 
 test("French query is accent-insensitive and displays only on-foot actions", () => {
   const rows = footQuickActions(meta, "combat", "RECHARGER", label);
+  assert.ok(footQuickActions(meta, "all", "RECHARGER", label).some((r) => r.action === "HumanoidReloadButton"));
   assert.ok(rows.some((entry) => entry.action === "HumanoidReloadButton"));
   assert.ok(rows.every((entry) => entry.category === "combat"));
   assert.ok(footQuickActions(meta, "essential", "sauté", () => "Sauter").some((r) => r.action === "HumanoidJumpButton"));
