@@ -81,3 +81,88 @@
 .edch-hotas-candidate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px;border-bottom:1px solid #405161}
 .edch-hotas-candidate span{font-size:.85rem}
 @media(max-width:710px){.edch-hotas-visuals{grid-template-columns:1fr}.edch-hotas-v167{padding:12px}.edch-hotas-candidate{flex-direction:column;align-items:stretch}}
+
+/* Cyberpunk Philou — accès rapide aux commandes À pied (Odyssey). */
+.foot-quick {
+  margin: 14px 0 18px;
+  padding: 15px;
+  border: 1px solid var(--accent-line);
+  border-radius: 10px;
+  background: var(--panel-inset);
+}
+.foot-quick h4 { margin: 0 0 6px; color: var(--cyan); }
+.foot-quick-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 12px 0;
+}
+.foot-quick-tabs button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.foot-quick-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.foot-quick-search input {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.foot-quick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 9px;
+  max-height: 520px;
+  overflow-y: auto;
+  margin: 12px 0;
+}
+.foot-quick-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.foot-quick-action {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  flex: 1 1 195px;
+}
+.foot-quick-action small, .foot-quick-action .sub {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.foot-quick-row-buttons {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.foot-quick-row button:focus-visible,
+.foot-quick-tabs button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+.foot-quick-advanced, .foot-quick-extra { margin: 14px 0; }
+.foot-quick-advanced > summary, .foot-quick-extra > summary {
+  padding: 9px 11px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.foot-quick-extra[open] > .edch-controls-write-v166 { margin-top: 14px; }
+@media (max-width: 650px) {
+  .foot-quick { padding: 10px; }
+  .foot-quick-list { max-height: 430px; }
+  .foot-quick-row { display: block; }
+  .foot-quick-row-buttons { margin-top: 8px; }
+}
