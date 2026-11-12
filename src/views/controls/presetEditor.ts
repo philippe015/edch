@@ -171,7 +171,7 @@ export class ControlsPresetEditor {
             :"Utilise les boutons déjà présents dans le profil "+(this.family==="hotas"?"X52 Pro / HOTAS":"Xbox")+". Aucun bouton inventé.";
           const selected=style.id===this.profile;
           return h("article.edch-c1612-profile",{class:selected?"active":""},
-            h("div.edch-c1612-profile-title",null,h("strong",null,template.label),
+            h("div.edch-c1612-profile-title",null,h("strong",null,this.family==="azerty"?template.label:`${style.label} · ${this.family==="hotas"?"HOTAS X52 Pro":"Xbox"}`),
               selected?h("span",null,"Sélectionné"):null),
             h("p",null,detail),
             h("p.edch-c1612-preview",null,
