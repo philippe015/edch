@@ -43,6 +43,18 @@ fn known_input(xml: &str, device: &str, key: &str) -> bool {
         .filter(|tag| ["Primary ", "Secondary ", "Binding "].iter().any(|start| tag.starts_with(start)))
         .any(|tag| attr(tag, "Device").as_deref() == Some(device) && attr(tag, "Key").as_deref() == Some(key))
 }
+// Exact keyboard keys used by the bundled AZERTY templates (not Elite defaults).
+// Keep synchronized with src/features/controls/preparedKeys.ts.
+const PREPARED_AZERTY_KEYS: &[&str] = &[
+    "Key_Z", "Key_S", "Key_Q", "Key_D", "Key_R", "Key_F", "Key_J", "Key_L",
+    "Key_H", "Key_T", "Key_M", "Key_N", "Key_V", "Key_Y", "Key_C", "Key_U",
+    "Key_B", "Key_E", "Key_G", "Key_X", "Key_Space", "Key_Tab",
+    "Key_LeftShift", "Key_LeftControl",
+];
+fn prepared_keyboard_key(device: &str, key: &str, modifiers: &[ControlsModifier]) -> bool {
+    device == "Keyboard" && modifiers.is_empty() && PREPARED_AZERTY_KEYS.contains(&key)
+}
+
 fn input_check(xml: &str, change: &ControlsChange) -> Result<(), String> {
     if !matches!(change.slot.as_str(), "primary"|"secondary") || !token(&change.action,100) {
         return Err("unknown or unsupported action/slot".into());
@@ -50,7 +62,8 @@ fn input_check(xml: &str, change: &ControlsChange) -> Result<(), String> {
     if !token(&change.device, 80) || !token(&change.key, 80) || change.modifiers.len() > 2 {
         return Err("invalid controller input".into());
     }
-    if !known_input(xml, &change.device, &change.key) {
+    if !known_input(xml, &change.device, &change.key)
+        && !prepared_keyboard_key(&change.device, &change.key, &change.modifiers) {
         return Err("input not present in selected source preset; no synthetic HOTAS IDs".into());
     }
     let mut seen=HashSet::new();
@@ -242,7 +255,18 @@ mod tests {
     fn c() -> ControlsChange {ControlsChange{action:"YawLeftButton".into(),slot:"secondary".into(),device:"SaitekX52Pro".into(),key:"Joy_2".into(),modifiers:vec![],replace_existing:false}}
     #[test] fn new_slot_preserves_existing_hotkey(){let s=rewrite_xml(XML,"EDCHPro001",&c()).unwrap();assert!(s.contains("<Primary Device=\"Keyboard\" Key=\"Key_A\" />"));assert!(s.contains("<Secondary Device=\"SaitekX52Pro\" Key=\"Joy_2\" />"));assert!(s.contains("<HyperSuperCombination>"));}
     #[test] fn refuse_override_by_default(){let mut x=c();x.slot="primary".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());x.replace_existing=true;assert!(rewrite_xml(XML,"EDCHPro001",&x).is_ok());}
-    #[test] fn reject_unknown_controller_or_action(){let mut x=c();x.key="Joy_999".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());x=c();x.action="UnknownAction".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());}
+    #[test] fn prepared_azerty_key_is_allowed_without_prior_use() {
+        let mut x=c();
+        x.device="Keyboard".into();
+        x.key="Key_Z".into();
+        assert!(input_check(XML,&x).is_ok());
+        x.key="Key_Unknown".into();
+        assert!(input_check(XML,&x).is_err());
+        x.key="Key_Z".into();
+        x.modifiers.push(ControlsModifier{device:"Keyboard".into(),key:"Key_LeftShift".into()});
+        assert!(input_check(XML,&x).is_err());
+    }
+        #[test] fn reject_unknown_controller_or_action(){let mut x=c();x.key="Joy_999".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());x=c();x.action="UnknownAction".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());}
     #[test] fn refuse_entities_and_injection(){let mut x=c();x.action="YawLeftButton><root".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());assert!(rewrite_xml("<!DOCTYPE x>" ,"EDCHPro001",&c()).is_err());}
     #[test] fn no_overwrite_source_name(){assert!(!filename_valid("../Custom.4.2.binds"));assert!(!filename_valid("Custom/hi.binds"));}
     #[test] fn keep_other_modifiers(){let s=rewrite_xml(XML,"EDCHPro001",&c()).unwrap();assert!(s.contains("<Modifier Device=\"Keyboard\" Key=\"Key_A\" />"));}
