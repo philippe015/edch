@@ -205,9 +205,11 @@ export function prepareAzerty(
     if(current.some(b=>byKey(b,rule.key))){covered++;continue;}
     const primary=current.find(b=>b.slot==="primary");
     const secondary=current.find(b=>b.slot==="secondary");
-    // Only keyboard slots may be replaced. A free slot is preferred.
-    const choose= !primary?"primary":!secondary?"secondary":
-      primary.device==="Keyboard"?"primary":secondary.device==="Keyboard"?"secondary":null;
+    // Prefer replacing an existing keyboard binding in the NEW profile,
+    // avoiding two contradictory keyboard keys for the same action.
+    // A HOTAS/mouse/gamepad binding is never replaced: use the other free slot.
+    const choose= !primary?"primary":primary.device==="Keyboard"?"primary":
+      !secondary?"secondary":secondary.device==="Keyboard"?"secondary":null;
     if(!choose){
       skipped.push({...rule,reason:"Les deux emplacements appartiennent à d'autres périphériques."});continue;
     }
