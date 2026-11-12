@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {isX52Device, gameJoystickCandidates, x52BindingSummary} from '../dist/js/features/controls/hotasMapping.js';
+import {isX52Device, isSupportedHotasDevice, gameJoystickCandidates, x52BindingSummary} from '../dist/js/features/controls/hotasMapping.js';
 const physical={id:'js0',name:'Saitek X52 Pro Flight Control System',vendor:'06a3',product:'0762',readable:true};
 const b=(action,slot,device,key,modifiers=[])=>({action,slot,device,key,modifiers});
 const binds=[
@@ -34,4 +34,17 @@ test('unknown buttons and modified-only inputs do not fabricate assignments',()=
 });
 test('summary counts only actual source .binds records',()=>{
  assert.deepEqual(x52BindingSummary(binds),{buttons:3,axes:1,actions:4});
+});
+
+test('X56 hardware is recognized but never assumed to share X52 physical IDs',()=>{
+ const x56={...physical,name:'Logitech G X56 H.O.T.A.S.',id:'js2'};
+ assert.equal(isSupportedHotasDevice(x56),true);
+ assert.equal(isX52Device(x56),false);
+ const x56Binds=[b('PrimaryFire','primary','SaitekX56','Joy_1')];
+ const observed=gameJoystickCandidates({deviceId:'js2',kind:'button',inputIndex:0,value:1},x56Binds,x56);
+ assert.equal(observed.length,1);
+ assert.equal(observed[0].offset,1);
+ assert.equal(observed[0].binding.key,'Joy_1');
+ assert.deepEqual(gameJoystickCandidates({deviceId:'js2',kind:'button',inputIndex:0,value:1},binds,x56),[],
+   'An X52 source input is not an X56 button mapping');
 });
