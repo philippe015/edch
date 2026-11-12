@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   GAME_SCOPES, INPUT_FAMILIES, USAGE_STYLES, detectedInputs,
-  inputFamilyMatches, recommendScopedProfile, scopeForGroup,
+  inputFamilyMatches, recommendScopedProfile, scopeForGroup, scopedInputWarnings,
 } from "../dist/js/features/controls/scopedProfiles.js";
 
 const meta = {
@@ -129,4 +129,17 @@ test("UI contract: three top level tabs, input family switch, advanced tools pre
   assert.ok(editor.includes("Préparer les suggestions"));
   assert.ok(editor.includes("controlsSavePresetBatch"));
   assert.ok(editor.includes("window.confirm("));
+});
+
+test("cross-subgroup shortcuts are warned about, unrelated contexts are not",()=>{
+  const extra={...meta,controls:{
+    ...meta.controls,ScannerTrigger:{g:"Scanners",n:"Scanner"},
+    UICancel:{g:"UI",n:"Annuler"},
+  }};
+  const existing=[b("ScannerTrigger","Keyboard","Key_J")];
+  const sameContext=[{action:"HyperSuperCombination",slot:"primary",
+    device:"Keyboard",key:"Key_J",modifiers:[],replaceExisting:false}];
+  assert.equal(scopedInputWarnings(existing,sameContext,extra).length,1);
+  const differentContext=[{...sameContext[0],action:"BuggyPrimaryFireButton"}];
+  assert.deepEqual(scopedInputWarnings(existing,differentContext,extra),[]);
 });
