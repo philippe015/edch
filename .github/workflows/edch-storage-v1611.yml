@@ -51,6 +51,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build required Tauri frontend before Rust tests
+        run: |
+          npm install --no-package-lock
+          npm run build
       - name: Run native tests including read-only filesystem tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Check native build
