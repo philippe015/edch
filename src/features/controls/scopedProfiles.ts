@@ -141,7 +141,7 @@ export function recommendScopedProfile(
     // exclusively from an already assigned equivalent action in a different game mode.
     const choices=family==="azerty"
       ? inputs.filter(b=>b.key===AZERTY[role]&&!b.modifiers.length)
-      : inputs.filter(b=>peerActions.includes(b.action));
+      : inputs.filter(b=>peerActions.includes(b.action)&&!b.modifiers.length);
     const candidate=choices.find(b=>{
       const sig=bindingKey(b);
       if(!known.has(sig)) return false;
