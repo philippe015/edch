@@ -30,7 +30,8 @@ test("native diagnostic reads only known paths; does not erase or follow symlink
     "edch-bgs.sqlite3", "edch-agent-memory-v153.sqlite3", "agent-memory-backups",
     "symbolic_links_are_never_followed",
   ]) assert.ok(rust.includes(item),item);
-  assert.doesNotMatch(rust, /remove_file|remove_dir_all|Command::new|\.write\(/);
+  const production = rust.split("#[cfg(test)]")[0];
+  assert.doesNotMatch(production, /remove_file|remove_dir_all|Command::new|\.write\(/);
 });
 
 test("Settings Advanced renders storage, backups and local SQLite health checks", () => {
