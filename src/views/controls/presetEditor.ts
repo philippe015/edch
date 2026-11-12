@@ -10,7 +10,7 @@ import {
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
 import {
-  detectedInputs, GAME_SCOPES, INPUT_FAMILIES, recommendScopedProfile, USAGE_STYLES,
+  detectedInputs, GAME_SCOPES, INPUT_FAMILIES, recommendScopedProfile, scopedInputWarnings, USAGE_STYLES,
   type GameScope, type InputFamily,
 } from "../../features/controls/scopedProfiles.js";
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
@@ -69,7 +69,8 @@ export class ControlsPresetEditor {
     const rows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
     if (src && this.editAction && !src.actions.includes(this.editAction)) this.editAction="";
     if (!inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=inputs.length?bindingKey(inputs[0]):"";
-    const editsWarnings=src?occupancyWarnings(src.binds,this.staged,meta):[];
+    const editsWarnings=src?[...new Set([...occupancyWarnings(src.binds,this.staged,meta),
+      ...scopedInputWarnings(src.binds,this.staged,meta)])]:[];
     const canSave=Boolean(src && this.staged.length && this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
       && (!editsWarnings.length || this.acknowledgeWarnings) && isTauri() && !isRemote() && !this.loading && !this.saving);
     const selectedAction=src?.actions.includes(this.editAction)?this.editAction:"";
@@ -233,7 +234,8 @@ export class ControlsPresetEditor {
     const ctx=this.context,source=this.source;
     if(!ctx||!source||source.filename!==this.selected||!this.staged.length||this.saving||this.loading)return;
     if(!this.staged.every(c=>isStagedAssignmentValid(c,source.actions,source.binds)))return;
-    const warnings=occupancyWarnings(source.binds,this.staged,ctx.meta);
+    const warnings=[...new Set([...occupancyWarnings(source.binds,this.staged,ctx.meta),
+      ...scopedInputWarnings(source.binds,this.staged,ctx.meta)])];
     if(warnings.length&&!this.acknowledgeWarnings)return;
     if(!window.confirm(`Créer un NOUVEAU profil EDCHPro avec ${this.staged.length} modification(s) ?\n\nProfil source : ${source.filename}\nLes profils existants restent intacts.\nFerme Elite Dangerous et son lanceur avant d'enregistrer.`))return;
     this.saving=true;this.repaint();
