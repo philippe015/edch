@@ -1,6 +1,5 @@
 /** Cyberpunk Philou v1.6.11: storage and backup status, strictly local and read-only. */
-import { clipboardWrite, isRemote, isTauri, storageDiagnostic, type StorageDiagnostic, type StorageEntry } from "../../../platform/bridge.js";
-import { sqliteHealth } from "../../../features/bgs/sqlite.js";
+import { clipboardWrite, isRemote, isTauri, storageDiagnostic, storageBgsIntegrity, type StorageDiagnostic, type StorageEntry } from "../../../platform/bridge.js";
 import { readableBytes, storageTotal } from "../../../features/storage/size.js";
 import { h } from "../../../ui/dom.js";
 
@@ -98,7 +97,7 @@ export class StorageCard {
     if(this.sqliteChecking || !isTauri() || isRemote()) return;
     this.sqliteChecking=true;this.sqliteResult="";this.repaint();
     try {
-      const result=await sqliteHealth();
+      const result=await storageBgsIntegrity();
       this.sqliteResult=result==="ok"?"Base BGS SQLite : intégrité vérifiée (quick_check = ok).":
         "Base BGS SQLite : résultat à examiner ("+result+").";
     } catch(e) { this.sqliteResult="Contrôle SQLite impossible : "+String(e); }
