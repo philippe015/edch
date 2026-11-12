@@ -15,7 +15,9 @@ import {
   type ConsoleEntry,
 } from "../../features/agent/consoleModel.js";
 import { mountBgsAlertPanel } from "../../features/bgs/alertPanel.js"; // EDCH-BGS-ALERTS-v1.5.4
-import { mountMultiAgentPanel } from "../../features/agent/multiAgentPanel.js"; // EDCH-COG-MULTI-v1.6.0
+import { mountMultiAgentPanel } from "../../features/agent/multiAgentPanel.js";
+import { mountMissionControlPanel } from "../../features/agent/missionControlPanel.js";
+import type { PatrolRoute } from "../../features/bgs/routes.js"; // EDCH-COG-MULTI-v1.6.0
 import type { BgsState } from "../../features/bgs/core.js";
 import { h } from "../../ui/dom.js";
 import { checkedMemoryAction, memoryAdd, memoryDelete, memoryList, validMemoryScope, memoryBackup, memoryBackups, memoryRestore, memoryDiagnostic, type MemoryScope } from "../../features/agent/memory.js"; // EDCH-COG-MEMORY-v1.6.1
@@ -327,7 +329,7 @@ function sectionTitle(node: Element): string {
 }
 
 /** Called at the end of the original BgsView.render(), after the async inner panels are filled. */
-export function mountBgsWorkspace(root: HTMLElement, commanderName?: string, factionName?: string, bgsState?: BgsState): void {
+export function mountBgsWorkspace(root: HTMLElement, commanderName?: string, factionName?: string, bgsState?: BgsState, route?: PatrolRoute): void {
   const incoming: MemoryScope = { commander: commanderName ?? "", faction: factionName ?? "" };
   const previous = memoryScope;
   memoryScope = validMemoryScope(incoming) ? incoming : null;
@@ -418,6 +420,7 @@ export function mountBgsWorkspace(root: HTMLElement, commanderName?: string, fac
   const influencePane = panes.get("influence")!;
   for (const node of influence) influencePane.appendChild(node);
   const agentPane = panes.get("agent")!;
+  if (bgsState && route) agentPane.appendChild(mountMissionControlPanel(bgsState, route));
   agentPane.appendChild(mountMultiAgentPanel());
   agentPane.appendChild(makeAgentConsole(agentToggle ?? null, agentStatusNode));
   if (bgsState) agentPane.prepend(mountBgsAlertPanel(bgsState, { commander: commanderName ?? "", faction: factionName ?? "" }));
