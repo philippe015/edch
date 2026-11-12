@@ -163,3 +163,29 @@ export function recommendScopedProfile(
   if(!result.length) warnings.push("Aucune attribution sûre à ajouter. Les touches existantes sont conservées ; l'attribution manuelle reste possible.");
   return {scope,family,usage,covered,relevant,absent,changes:result,warnings};
 }
+
+/** Warn for collisions between different subgroups of the SAME playable context.
+ * Unlike same-group reports, Ship+Scanners/Fighter are treated together.
+ */
+export function scopedInputWarnings(
+  original:readonly Bind[], proposed:readonly PresetAssignment[], meta:BindsMeta,
+):string[] {
+  const replaced=new Set(proposed.map(p=>`${p.action}|${p.slot}`));
+  const warnings:string[]=[];
+  for(const p of proposed) {
+    const scope=scopeForGroup(groupOf(meta,p.action));
+    if(!scope) continue;
+    const sig=bindingKey(p);
+    const occupied=original.some(other=>
+      other.slot!=="axis" && other.action!==p.action &&
+      scopeForGroup(groupOf(meta,other.action))===scope &&
+      !replaced.has(`${other.action}|${other.slot}`) && bindingKey(other)===sig);
+    const staged=proposed.some(other=>
+      other!==p && other.action!==p.action &&
+      scopeForGroup(groupOf(meta,other.action))===scope &&
+      bindingKey(other)===sig);
+    if(occupied||staged) warnings.push(
+      `Touche partagée dans ${scope}: ${p.device} ${p.key} pour ${p.action}. Vérifier avant de créer un profil.`);
+  }
+  return [...new Set(warnings)];
+}
