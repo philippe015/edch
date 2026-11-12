@@ -300,6 +300,7 @@ export interface StorageDiagnostic {
   checkedUnix: number;
 }
 export const storageDiagnostic = (): Promise<StorageDiagnostic> => invoke<StorageDiagnostic>("storage_diagnostic");
+export const storageBgsIntegrity = (): Promise<string> => invoke<string>("storage_bgs_integrity");
 
 export const optionsDir = () => invoke<string>("options_dir");
 export const listOptionFiles = (): Promise<OptionFile[]> =>
