@@ -5,6 +5,8 @@ import { diagnoseBgsReliability, verifyBgsSnapshot } from "../../features/bgs/re
 import { buildBgsReportHtml } from "../../features/reports/htmlReport.js";
 import { currentTick, refreshTick, type TickResult } from "../../features/bgs/monitor.js";
 import { withVisits } from "../../features/bgs/utils.js";
+import { readCombatZones, combatZoneSummary } from "../../features/bgs/combatZones.js";
+import { mountCombatZonesPanel } from "../../features/bgs/combatZonesPanel.js";
 import {
   commanderCsv,
   commanderKey,
@@ -542,6 +544,8 @@ export class BgsView implements View {
       !!location?.controllingFaction &&
       location.controllingFaction.toLocaleLowerCase() === preferred.toLocaleLowerCase();
     const summary = commanderSummary(profile, preferred, sameFaction ? this.state.systems.map((s) => s.name) : []);
+    const czHistory = readCombatZones(who);
+    const czTotal = czHistory.error ? "Erreur" : combatZoneSummary(czHistory.records, preferred).total;
     const displayDate = (d?: string) => (d ? new Date(d).toLocaleString("fr-FR") : "inconnue");
     const kindLabels: Record<string, string> = {
       jump: "Saut FSD",
@@ -586,6 +590,8 @@ export class BgsView implements View {
       ["Missions terminées (faction citée)", summary.missionForFaction],
       ["Événements liés à la faction", summary.linkedEvents],
       ["Activités sans faction identifiée", summary.unattributed],
+      ["CZ effectuées · saisies manuellement", czTotal],
+      ["Primes de faction (30 j) · pas des CZ", profile.entries.filter((e) => e.kind === "kill-bond" && Date.now() - Date.parse(e.at) <= 30 * 86400_000 && Date.now() >= Date.parse(e.at)).length],
     ];
     const statsEl = h(
       "div.bgs-stats",
@@ -702,6 +708,7 @@ export class BgsView implements View {
             )
           : null,
         currentMissionPanel,
+        mountCombatZonesPanel(who, preferred, location?.system),
         h("h3", null, "Activités confirmées par le journal · 30 derniers jours"),
         statsEl,
         h(
