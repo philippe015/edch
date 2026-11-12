@@ -1,21 +1,9 @@
 /** Cyberpunk Philou v1.6.11: storage and backup status, strictly local and read-only. */
 import { clipboardWrite, isRemote, isTauri, storageDiagnostic, type StorageDiagnostic, type StorageEntry } from "../../../platform/bridge.js";
 import { sqliteHealth } from "../../../features/bgs/sqlite.js";
+import { readableBytes, storageTotal } from "../../../features/storage/size.js";
 import { h } from "../../../ui/dom.js";
 
-export function readableBytes(value: number): string {
-  if (!Number.isFinite(value) || value < 0) return "Inconnu";
-  if (value < 1024) return `${Math.round(value)} octets`;
-  const units = ["Kio", "Mio", "Gio", "Tio"];
-  let n = value;
-  let index = -1;
-  do { n /= 1024; index++; } while (n >= 1024 && index < units.length - 1);
-  return `${n.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} ${units[index]}`;
-}
-export function storageTotal(report: StorageDiagnostic): number | null {
-  if (report.entries.some(e => e.incomplete)) return null;
-  return report.entries.reduce((total, entry) => total + entry.bytes, 0);
-}
 const humanDate = (unix: number | null): string =>
   unix === null ? "Non disponible" : new Date(unix * 1000).toLocaleString("fr-FR");
 
@@ -30,7 +18,7 @@ export class StorageCard {
   render(): HTMLElement {
     const enabled = isTauri() && !isRemote();
     const rows = this.report?.entries ?? [];
-    const total = this.report ? storageTotal(this.report) : null;
+    const total = this.report ? storageTotal(this.report.entries) : null;
     const item = (entry: StorageEntry) => h("div.edch-storage-row", null,
       h("div.edch-storage-info", null,
         h("strong", null, entry.label),
