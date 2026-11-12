@@ -43,11 +43,12 @@ export function gameJoystickCandidates(
     { key: `Joy_${event.inputIndex}`, offset: 0 },
     { key: `Joy_${event.inputIndex + 1}`, offset: 1 },
   ];
+  const expectedFamily = isX52Device(physical) ? /x52/i : /x56/i;
   const seen = new Set<string>();
   const out: CandidateMapping[] = [];
   for (const candidate of possibilities) {
     for (const binding of binds) {
-      if (!/x52|x56|saitek|logitech/i.test(binding.device) || binding.key !== candidate.key || binding.slot === "axis" || binding.modifiers.length) continue;
+      if (!expectedFamily.test(binding.device) || binding.key !== candidate.key || binding.slot === "axis" || binding.modifiers.length) continue;
       const unique = JSON.stringify([binding.device, binding.key]);
       if (seen.has(unique)) continue;
       seen.add(unique);
