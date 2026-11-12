@@ -11,6 +11,7 @@ import { appearanceCard, pagesCard } from "./cards/display.js";
 import { engineersCard, launchCard, navigationCard } from "./cards/game.js";
 import { appCard } from "./cards/general.js";
 import { updatesCard } from "./cards/updates.js";
+import { StorageCard } from "./cards/storage.js";
 import { buildSiteCard, keyboardCard, languageCard, pageDefaultsCard } from "./cards/preferences.js";
 import { notifyCard } from "./cards/notifications.js";
 
@@ -45,6 +46,7 @@ export class SettingsView implements View {
   ) {}
 
   private mode = "installer";
+  private storageCard = new StorageCard();
   private debugPath: string | null = null;
 
   mount(root: HTMLElement) {
@@ -219,6 +221,7 @@ export class SettingsView implements View {
       notifyCard(this.ctx, () => this.render()),
       pagesCard(this.ctx, () => this.render()),
       appearanceCard(this.ctx, () => this.render()),
+      isTauri() && !isRemote() ? this.storageCard.render() : null,
       isTauri() && !isRemote() ? this.logsCard() : null,
     );
     // Tabs: each card says which tab it belongs to (data-tab).
