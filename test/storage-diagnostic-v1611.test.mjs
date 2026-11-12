@@ -28,6 +28,7 @@ test("native diagnostic reads only known paths; does not erase or follow symlink
     "app_local_data_dir", "app_config_dir", "documents_dir",
     "symlink_metadata", "MAX_ENTRIES", "MAX_DEPTH", "storage_diagnostic",
     "edch-bgs.sqlite3", "edch-agent-memory-v153.sqlite3", "agent-memory-backups",
+    "storage_bgs_integrity", "SQLITE_OPEN_READ_ONLY",
     "symbolic_links_are_never_followed",
   ]) assert.ok(rust.includes(item),item);
   const production = rust.split("#[cfg(test)]")[0];
@@ -46,5 +47,8 @@ test("Settings Advanced renders storage, backups and local SQLite health checks"
     "Sauvegardes SQLite des agents","Copier chemin"]) assert.ok(card.includes(value),value);
   assert.ok(card.includes("isRemote()"));
   assert.ok(bridge.includes('"storage_diagnostic"'));
+  assert.ok(bridge.includes('"storage_bgs_integrity"'));
+  assert.ok(card.includes("storageBgsIntegrity()"));
   assert.ok(lib.includes("storage_diagnostic::storage_diagnostic"));
+  assert.ok(lib.includes("storage_diagnostic::storage_bgs_integrity"));
 });
