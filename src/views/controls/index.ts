@@ -343,9 +343,7 @@ export class ControlsView implements View {
         h("button.ghost", { onclick: () => window.print() }, t("controls.printSheet")),
       ),
       this.note ? h("p.notice", null, icon("warn"), ` ${this.note}`) : null,
-      this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
-      this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings()),
-      // EDCH-ONFOOT-EDIT-v1.4.4: edit and save a separate Odyssey keyboard-only preset.
+      // On-foot quick controls appear FIRST in the À pied tab. The complex workbench is optional.
       this.mode === "foot"
         ? this.onFootEditor.render(
             meta,
@@ -360,6 +358,16 @@ export class ControlsView implements View {
             },
           )
         : null,
+      this.mode === "foot"
+        ? h("details.foot-quick-extra", null,
+            h("summary", null, "Outils avancés : éditeur PRO, profils HOTAS et réglages experts"),
+            this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
+            this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings()),
+          )
+        : [
+            this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
+            this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings()),
+          ],
       devices.length
         ? h(
             "div.device-tabs",

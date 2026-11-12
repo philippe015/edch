@@ -11,7 +11,11 @@ import {
   type FootPresetResult,
   type OptionFile,
 } from "../../platform/bridge.js";
-import { h, icon, toast } from "../../ui/dom.js";
+import { h, icon, replace, toast } from "../../ui/dom.js";
+import { localizedKeyLabel } from "../../features/controls/actionLabels.js";
+import {
+  FOOT_CATEGORIES, footQuickActions, planFootAzerty, type FootQuickCategory,
+} from "../../features/controls/footQuick.js";
 
 export class OnFootEditor {
   private action = "";
@@ -20,6 +24,9 @@ export class OnFootEditor {
   private draft: FootChange[] = [];
   private message = "";
   private busy = false;
+  private quickCategory: FootQuickCategory = "essential";
+  private quickSearch = "";
+  private draftSource = "";
 
   render(
     meta: BindsMeta,
@@ -39,16 +46,141 @@ export class OnFootEditor {
         files.map((f) => f.name),
       ) ||
       "";
+    // Changing the source never silently carries a draft over to another .binds profile.
+    if (this.draftSource !== source) {
+      if (this.draft.length) this.message = "Changement de profil : ancien brouillon annulé pour éviter une mauvaise attribution.";
+      this.draft = [];
+      this.listening = false;
+      this.draftSource = source;
+    }
     const selected = this.action;
     const current = binds.find((b) => b.action === selected && b.slot === this.slot);
     const staged = this.draft.find((c) => c.action === selected && c.slot === this.slot);
     const conflicts = conflictsForFoot(this.draft, binds, meta);
     const editable = isTauri() && !isRemote() && !!source && !!actions.length;
+    const slotProtected = (action: string, slot: "primary" | "secondary") => {
+      const existing = binds.find((b) => b.action === action && b.slot === slot);
+      return existing !== undefined && existing.device !== "Keyboard";
+    };
+    const preview = (action: string, slot: "primary" | "secondary"): string => {
+      const candidate = this.draft.find((d) => d.action === action && d.slot === slot);
+      if (candidate) {
+        return candidate.key
+          ? "Brouillon : " + [...candidate.modifiers, candidate.key].map((k) => localizedKeyLabel(meta, k)).join(" + ")
+          : "Brouillon : effacé";
+      }
+      const existing = binds.find((b) => b.action === action && b.slot === slot);
+      return existing
+        ? existing.device + " · " + [...existing.modifiers.map((m) => m.key), existing.key]
+          .map((key) => localizedKeyLabel(meta, key)).join(" + ")
+        : "Libre";
+    };
+    const captureQuick = (action: string, slot: "primary" | "secondary"): HTMLButtonElement => {
+      const occupied = slotProtected(action, slot);
+      let button: HTMLButtonElement;
+      button = h("button.ghost.small", {
+        type: "button",
+        disabled: !editable || this.busy || occupied,
+        title: occupied ? "Emplacement souris/HOTAS protégé : utilise un emplacement libre." : "Cliquer puis appuyer sur la touche souhaitée",
+        onclick: () => {
+          this.action = action;
+          this.slot = slot;
+          this.listening = true;
+          button.textContent = "Appuie sur une touche · Échap annule";
+          button.focus();
+        },
+        onkeydown: (event: KeyboardEvent) => {
+          if (!this.listening || this.action !== action || this.slot !== slot) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (event.code === "Escape") {
+            this.listening = false;
+            redraw();
+            return;
+          }
+          const pressed = captureFootKey(event);
+          this.listening = false;
+          if (!pressed) {
+            this.message = "Touche non reconnue : utilise une lettre, un chiffre, une flèche ou F1–F12.";
+          } else {
+            this.draft = this.draft.filter((d) => d.action !== action || d.slot !== slot);
+            this.draft.push({ action, slot, key: pressed.key, modifiers: pressed.modifiers });
+            this.message = localizedActionLabel(meta, action) + " : " + pressed.label + " ajouté au brouillon.";
+          }
+          redraw();
+        },
+      }, slot === "primary" ? "Changer P" : "Changer S");
+      return button;
+    };
+    const quickList = h("div.foot-quick-list");
+    const quickCount = h("span.sub");
+    const refreshQuick = () => {
+      const rows = footQuickActions(meta, this.quickCategory, this.quickSearch, (action) => localizedActionLabel(meta, action));
+      quickCount.textContent = rows.length + " commandes";
+      replace(quickList, ...rows.map((row) =>
+        h("div.foot-quick-row", null,
+          h("div.foot-quick-action", null,
+            h("strong", null, row.label),
+            h("small", null, row.action),
+            h("span.sub", null, "P : " + preview(row.action, "primary") + " · S : " + preview(row.action, "secondary")),
+          ),
+          h("div.foot-quick-row-buttons", null,
+            captureQuick(row.action, "primary"),
+            captureQuick(row.action, "secondary"),
+          ),
+        ),
+      ));
+      if (!rows.length) quickList.appendChild(h("p.sub", null, "Aucune commande trouvée dans cette catégorie."));
+    };
+    refreshQuick();
+    const quickPanel = h("section.foot-quick", null,
+      h("h4", null, "Réglage rapide · commandes à pied"),
+      h("p.sub", null, "Choisis une commande, clique sur Changer P ou S, puis appuie directement sur la touche. Le profil original n'est pas modifié."),
+      h("div.foot-quick-tabs", null, ...FOOT_CATEGORIES.map((cat) =>
+        h("button.ghost.small", {
+          type: "button",
+          class: this.quickCategory === cat.id ? "active" : "",
+          onclick: () => { this.quickCategory = cat.id; redraw(); },
+        }, cat.label),
+      )),
+      h("label.foot-quick-search", null, "Rechercher une action : ",
+        h("input", {
+          type: "search",
+          maxLength: 120,
+          value: this.quickSearch,
+          placeholder: "Sauter, courir, recharger, interagir…",
+          oninput: (event: Event) => {
+            this.quickSearch = (event.target as HTMLInputElement).value;
+            refreshQuick();
+          },
+        }),
+      ),
+      quickCount,
+      quickList,
+      h("div.row", { style: { flexWrap: "wrap", gap: "8px", marginTop: "10px" } },
+        h("button.ghost", {
+          type: "button",
+          disabled: !editable || this.busy,
+          onclick: () => {
+            const plan = planFootAzerty(meta, binds, this.draft);
+            this.draft.push(...plan.changes);
+            const summary = plan.skipped.slice(0, 3)
+              .map((item) => localizedActionLabel(meta, item.action) + " (" + item.reason + ")")
+              .join(" · ");
+            this.message = "Suggestion AZERTY : " + plan.changes.length + " ajout(s), " +
+              plan.alreadyConfigured + " déjà configurée(s), " + plan.skipped.length + " ignorée(s)." +
+              (summary ? " " + summary : "");
+            redraw();
+          },
+        }, "Préparer des touches AZERTY (sans enregistrer)"),
+      ),
+      h("p.sub", null, "Les suggestions AZERTY évitent les touches déjà occupées et les emplacements réservés à la souris/HOTAS. Elles restent un brouillon jusqu'à la création du nouveau profil."),
+    );
 
     const capture = h(
       "button.ghost.small",
       {
-        disabled: !editable || this.busy,
+        disabled: !editable || this.busy || slotProtected(this.action, this.slot),
         onclick: () => {
           this.listening = true;
           capture.textContent = "Appuie sur une touche… (Échap pour annuler)";
@@ -81,6 +213,11 @@ export class OnFootEditor {
 
     const save = async () => {
       if (!editable || this.busy || !this.draft.length) return;
+      if (this.draft.some((d) => slotProtected(d.action, d.slot))) {
+        this.message = "Une touche appartient à la souris/HOTAS : cette modification est interdite.";
+        redraw();
+        return;
+      }
       this.busy = true;
       try {
         const running = await gameRunning();
@@ -132,6 +269,9 @@ export class OnFootEditor {
       source
         ? h("p.sub", null, "Préréglage de départ : ", h("code", null, source), " — L'original ne sera jamais écrasé.")
         : null,
+      quickPanel,
+      h("details.foot-quick-advanced", null,
+        h("summary", null, "Mode avancé : sélectionner parmi toutes les actions Odyssey"),
       h(
         "div.row",
         { style: { flexWrap: "wrap", gap: "8px", alignItems: "center" } },
@@ -172,7 +312,7 @@ export class OnFootEditor {
         h(
           "button.ghost.small",
           {
-            disabled: !editable || this.busy,
+            disabled: !editable || this.busy || slotProtected(this.action, this.slot),
             onclick: () => {
               this.draft = this.draft.filter((c) => c.action !== this.action || c.slot !== this.slot);
               this.draft.push({ action: this.action, slot: this.slot, key: "", modifiers: [] });
@@ -182,6 +322,7 @@ export class OnFootEditor {
           },
           "Effacer cette touche",
         ),
+      ),
       ),
       h(
         "p.sub",
