@@ -2,6 +2,7 @@
  * All recommendations are advisory and require explicit preview/confirmation before saving.
  */
 import { type Bind, type BindsMeta, groupOf } from "./binds.js";
+import { approvedPreparedKey } from "./preparedKeys.js";
 
 export type ControlTab = "all" | "ship" | "srv" | "foot" | "ui";
 export type SuggestedProfile = "balanced" | "navigation" | "combat" | "exploration";
@@ -152,7 +153,10 @@ export function recommendProfile(
 }
 export function isStagedAssignmentValid(c: PresetAssignment, actions: readonly string[], binds: readonly Bind[]): boolean {
   if (!actions.includes(c.action) || !["primary","secondary"].includes(c.slot)) return false;
-  if (!inputCatalog(binds).some(b=>bindingKey(b)===bindingKey(c))) return false;
+  // A reviewed prepared AZERTY key is allowed even if no original action used it.
+  // HOTAS, Xbox and mouse inputs still have to exist in the source file.
+  if (!approvedPreparedKey(c.device,c.key,c.modifiers) &&
+      !inputCatalog(binds).some(b=>bindingKey(b)===bindingKey(c))) return false;
   const previous=binds.find(b=>b.action===c.action && b.slot===c.slot);
   return !previous || c.replaceExisting;
 }
