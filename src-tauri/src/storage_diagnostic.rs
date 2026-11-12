@@ -167,6 +167,24 @@ pub fn storage_diagnostic(app: AppHandle) -> Result<StorageDiagnostic, String> {
     Ok(produce(&executable, &data, &config, &documents, bindings.as_deref()))
 }
 
+/// Run SQLite integrity check without creating a database, table, WAL or backup.
+#[tauri::command]
+pub fn storage_bgs_integrity(app: AppHandle) -> Result<String, String> {
+    use rusqlite::{Connection, OpenFlags};
+    let data = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let db = data.join("edch-bgs.sqlite3");
+    let meta = fs::symlink_metadata(&db).map_err(|_| "bgsDatabaseMissing".to_string())?;
+    if !meta.is_file() || meta.file_type().is_symlink() {
+        return Err("bgsDatabaseUnsafe".into());
+    }
+    let con = Connection::open_with_flags(&db, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| e.to_string())?;
+    let check: String = con.query_row("PRAGMA quick_check", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+    if check != "ok" { return Err("bgsDatabaseCorrupt".into()); }
+    Ok("ok".into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
