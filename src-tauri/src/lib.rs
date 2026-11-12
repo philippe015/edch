@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 mod app;
 mod bgs_db;
+mod storage_diagnostic; // EDCH-CYBERPUNK-STORAGE-v1.6.11
 mod agent_memory; // EDCH-COG-MEMORY-v1.5.3
 mod bgs_backup; // EDCH-BGS-RELIABILITY-v1.4.9
 mod bgs_pdf; // EDCH-BGS-PDF-v1.4.3
@@ -60,6 +61,7 @@ pub fn run() {
         .manage(Arc::new(journal::WatchState::default()))
         .manage(remote::RemoteState::default())
         .invoke_handler(tauri::generate_handler![
+            storage_diagnostic::storage_diagnostic,
             bgs_db::bgs_load,
             agent_memory::agent_memory_add,
             agent_memory::agent_memory_list,
