@@ -62,6 +62,7 @@ pub fn run() {
         .manage(remote::RemoteState::default())
         .invoke_handler(tauri::generate_handler![
             storage_diagnostic::storage_diagnostic,
+            storage_diagnostic::storage_bgs_integrity,
             bgs_db::bgs_load,
             agent_memory::agent_memory_add,
             agent_memory::agent_memory_list,
