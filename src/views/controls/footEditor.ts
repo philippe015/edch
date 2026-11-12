@@ -1,13 +1,15 @@
 // EDCH-ONFOOT-EDIT-v1.4.4 — opt-in editor for Odyssey "On Foot" keyboard bindings.
 // Stages changes in EDCH and saves a NEW .binds preset; never overwrites the source.
-import { type Bind, type BindsMeta, fileForPreset } from "../../features/controls/binds.js";
-import { captureFootKey, conflictsForFoot, footActions, type FootChange } from "../../features/controls/footEdit.js";
+import { type Bind, type BindsMeta, fileForPreset, parseBinds } from "../../features/controls/binds.js";
+import { captureFootKey, conflictsForFoot, type FootChange } from "../../features/controls/footEdit.js";
+import { FOOT_PROFILES, footActionsInSource, planFootProfile, type FootProfileId } from "../../features/controls/footProfiles.js";
 import { localizedActionLabel } from "../../features/controls/actionLabels.js";
 import {
   footSavePreset,
   gameRunning,
   isRemote,
   isTauri,
+  readOptionFile,
   type FootPresetResult,
   type OptionFile,
 } from "../../platform/bridge.js";
@@ -20,6 +22,12 @@ export class OnFootEditor {
   private draft: FootChange[] = [];
   private message = "";
   private busy = false;
+  private profile: FootProfileId = "azerty";
+  private selectedSource = "";
+  private sourceLoadGeneration = 0;
+  private sourceLoading = false;
+  private sourceError = "";
+  private sourceData: { filename: string; binds: Bind[]; actions: string[]; layout: string } | null = null;
 
   render(
     meta: BindsMeta,
@@ -30,8 +38,6 @@ export class OnFootEditor {
     redraw: () => void,
     reload: (file: string) => Promise<void>,
   ): HTMLElement {
-    const actions = footActions(meta);
-    if (!actions.includes(this.action)) this.action = actions[0] ?? "";
     const source =
       chosen ||
       fileForPreset(
@@ -39,11 +45,45 @@ export class OnFootEditor {
         files.map((f) => f.name),
       ) ||
       "";
+    if (source !== this.selectedSource) {
+      this.selectedSource = source;
+      this.sourceData = null;
+      this.sourceError = "";
+      this.draft = []; // never carry staged edits across different .binds sources
+      this.message = "";
+      const generation = ++this.sourceLoadGeneration;
+      this.sourceLoading = !!source;
+      if (source) {
+        void readOptionFile("Bindings", source)
+          .then((xml) => {
+            if (generation !== this.sourceLoadGeneration || this.selectedSource !== source) return;
+            const parsed = parseBinds(xml);
+            this.sourceData = {
+              filename: source, binds: parsed.binds, actions: footActionsInSource(xml, meta),
+              layout: parsed.keyboardLayout,
+            };
+          })
+          .catch((error: unknown) => {
+            if (generation === this.sourceLoadGeneration) this.sourceError = String(error);
+          })
+          .finally(() => {
+            if (generation === this.sourceLoadGeneration) {
+              this.sourceLoading = false;
+              redraw();
+            }
+          });
+      }
+    }
+    const sourceData = this.sourceData?.filename === source ? this.sourceData : null;
+    const actions = sourceData?.actions ?? [];
+    const sourceBinds = sourceData?.binds ?? [];
+    if (!actions.includes(this.action)) this.action = actions[0] ?? "";
     const selected = this.action;
-    const current = binds.find((b) => b.action === selected && b.slot === this.slot);
+    const current = sourceBinds.find((b) => b.action === selected && b.slot === this.slot);
     const staged = this.draft.find((c) => c.action === selected && c.slot === this.slot);
-    const conflicts = conflictsForFoot(this.draft, binds, meta);
-    const editable = isTauri() && !isRemote() && !!source && !!actions.length;
+    const conflicts = conflictsForFoot(this.draft, sourceBinds, meta);
+    const editable = isTauri() && !isRemote() && !!sourceData && !!actions.length;
+    const proposal = sourceData ? planFootProfile(this.profile, actions, sourceBinds, meta) : null;
 
     const capture = h(
       "button.ghost.small",
@@ -132,6 +172,52 @@ export class OnFootEditor {
       source
         ? h("p.sub", null, "Préréglage de départ : ", h("code", null, source), " — L'original ne sera jamais écrasé.")
         : null,
+      this.sourceLoading ? h("p.sub", { role: "status" }, "Analyse du profil Odyssey en cours…") : null,
+      this.sourceError ? h("p.notice", { role: "alert" }, "Lecture du préréglage impossible : " + this.sourceError) : null,
+      sourceData && !/^(fr|nl-BE)(-|$)/i.test(sourceData.layout)
+        ? h("p.notice", null, icon("warn"), " Profil déclaré ", h("code", null, sourceData.layout),
+            " dans le jeu : vérifie que le clavier réellement utilisé est AZERTY avant d'appliquer les propositions.")
+        : null,
+      h("section", { style: { marginBottom: "16px", padding: "12px", border: "1px solid var(--border, #666)", borderRadius: "8px" } },
+        h("h4", null, "Profils intelligents · clavier français AZERTY"),
+        h("p.sub", null,
+          "Choisis un usage : les propositions sont calculées sur le fichier .binds sélectionné. " +
+          "ZQSD est utilisé pour avancer, reculer et se déplacer latéralement. Aucun bouton HOTAS ni commande vaisseau/VRS ne sera modifié."),
+        h("label", null, "Profil : ",
+          h("select", {
+            disabled: !editable || this.busy,
+            onchange: (e: Event) => {
+              this.profile = (e.target as HTMLSelectElement).value as FootProfileId;
+              redraw();
+            },
+          }, ...FOOT_PROFILES.map((p) => h("option", { value: p.id, selected: this.profile === p.id }, p.name))),
+        ),
+        proposal ? h("p.sub", null, proposal.description) : null,
+        proposal ? h("p.sub", { role: "status" },
+          `${proposal.changes.length} changement(s) proposé(s) · ${proposal.alreadyCorrect} déjà conforme(s) · ${proposal.skipped.length} ignoré(s) pour préserver la configuration.`)
+          : null,
+        proposal && proposal.changes.length ? h("div", null,
+          ...proposal.changes.slice(0, 16).map((c) =>
+            h("p.sub", null,
+              `${localizedActionLabel(meta, c.action)} : ${c.key.replace(/^Key_/, "")} (${c.slot === "primary" ? "principal" : "secondaire"})`)))
+          : null,
+        proposal && proposal.skipped.length ? h("p.sub", null,
+          "Propositions écartées : " + proposal.skipped.slice(0, 4).map((v) =>
+            `${localizedActionLabel(meta, v.action)} — ${v.reason}`).join(" ; ") +
+          (proposal.skipped.length > 4 ? ` (+${proposal.skipped.length - 4} autres)` : "")) : null,
+        h("button.ghost.small", {
+          disabled: !editable || this.busy || !proposal?.changes.length || !!proposal?.conflicts.length,
+          onclick: () => {
+            if (!proposal?.changes.length) return;
+            if (this.draft.length &&
+                !window.confirm("Remplacer le brouillon actuel par ce profil AZERTY ? Le jeu ne sera pas modifié.")) return;
+            this.draft = proposal.changes.map((c) => ({ ...c, modifiers: [...c.modifiers] }));
+            this.message = `${proposal.name} : ${this.draft.length} modification(s) préparée(s). Vérifie puis crée ton nouveau profil.`;
+            redraw();
+          },
+        }, "Préparer ce profil (sans enregistrer)"),
+        h("p.sub", null, "La préparation ne change aucun fichier. La création d'EDCHFoot nécessite une confirmation séparée."),
+      ),
       h(
         "div.row",
         { style: { flexWrap: "wrap", gap: "8px", alignItems: "center" } },
