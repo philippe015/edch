@@ -1,7 +1,7 @@
 // The player remains in control: natural-language rules may suggest, never execute.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pilotIntent, pilotReply } from "../dist/features/agent/missionControl.js";
+import { pilotIntent, pilotReply } from "../dist/js/features/agent/missionControl.js";
 
 const state = {
   faction: "1ER ASTRA MILITARUM",
