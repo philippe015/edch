@@ -76,8 +76,8 @@ test("existing correct key is not overwritten; occupied keyboard can be replaced
   assert.ok(!out.changes.some(x=>x.action==="HumanoidForwardButton"));
   const changed=out.changes.find(x=>x.action==="HumanoidBackwardButton");
   assert.equal(changed.key,"Key_S");
-  assert.equal(changed.slot,"secondary"); // favor free slot instead of overwriting an old keyboard input
-  assert.equal(changed.replaceExisting,false);
+  assert.equal(changed.slot,"primary"); // replace only the keyboard input in the NEW profile
+  assert.equal(changed.replaceExisting,true);
 });
 
 test("occupied keys in same context are not offered; keys across contexts may be reused",()=>{
