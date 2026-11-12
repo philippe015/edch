@@ -1407,6 +1407,6 @@ export class BgsView implements View {
     );
     this.renderFactionSystems();
     this.renderCommanderOverview();
-    mountBgsWorkspace(root, this.ctx.store.state.cmdr.commander, this.state.faction, this.state); // EDCH-COG-MEMORY-v1.5.3 EDCH-BGS-ALERTS-v1.5.4
+    mountBgsWorkspace(root, this.ctx.store.state.cmdr.commander, this.state.faction, this.state, route); // EDCH-COG-MEMORY-v1.5.3 EDCH-BGS-ALERTS-v1.5.4
   }
 }

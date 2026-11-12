@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "EDCH",
+  "productName": "Cyberpunk Philou EDCH",
   "version": "0.10.11",
   "identifier": "EDCompanionHelper",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "EDCH BGS v1.6.8.3 — Elite Dangerous Companion Helper (Manjaro)",
+        "title": "Cyberpunk Philou — EDCH BGS · Copilote (Manjaro)",
         "width": 1320,
         "height": 860,
         "minWidth": 960,
@@ -34,9 +34,9 @@
       "icons/128x128@2x.png",
       "icons/icon.ico"
     ],
-    "shortDescription": "Elite Dangerous companion",
+    "shortDescription": "Cyberpunk Philou BGS companion for Elite Dangerous",
     "longDescription": "Reads the Elite Dangerous journal in real time: materials, engineering, wishlist and where to find each material.",
-    "publisher": "BKNadir",
+    "publisher": "Cyberpunk Philou",
     "category": "Game",
     "licenseFile": "installer-notice.txt",
     "windows": {

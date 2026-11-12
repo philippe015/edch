@@ -14,6 +14,7 @@ export interface ThemeSettings {
 }
 
 export const PRESETS: { id: string; label: string; accent: string; cyan: string; bg: string }[] = [
+  { id: "cyberpunk", label: "Cyberpunk Philou", accent: "#ff36c7", cyan: "#00e5ff", bg: "#070817" },
   { id: "elite", label: t("theme.eliteOriginal"), accent: "#ff7a18", cyan: "#5cc8e8", bg: "#0a0c0f" },
   { id: "blue", label: t("theme.blue"), accent: "#4da3ff", cyan: "#7fe0d2", bg: "#090c12" },
   { id: "green", label: t("theme.green"), accent: "#3ddc84", cyan: "#5cc8e8", bg: "#090d0b" },
@@ -24,9 +25,9 @@ export const PRESETS: { id: string; label: string; accent: string; cyan: string;
 ];
 
 export const DEFAULT_THEME: ThemeSettings = {
-  preset: "elite",
-  accent: "#ff7a18",
-  cyan: "#5cc8e8",
-  bg: "#0a0c0f",
+  preset: "cyberpunk",
+  accent: "#ff36c7",
+  cyan: "#00e5ff",
+  bg: "#070817",
   oled: false,
 };

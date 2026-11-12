@@ -90,6 +90,7 @@ export function applyTheme(theme: ThemeSettings) {
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
   root.style.setProperty("color-scheme", light ? "light" : "dark");
   root.classList.toggle("oled", theme.oled);
+  root.classList.toggle("cyberpunk-philou", theme.preset === "cyberpunk");
   root.classList.toggle("light", light);
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
 }

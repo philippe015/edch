@@ -4403,3 +4403,47 @@ button.side-tab > .side-tab-badge {
   vertical-align: top;
   overflow-wrap: anywhere;
 }
+
+/* Cyberpunk Philou: optional neon skin; existing themes remain usable. */
+.brand .cp-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--cyan);
+  border-radius: 5px;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  box-shadow: 0 0 13px var(--cyan-dim);
+}
+html.cyberpunk-philou .topbar {
+  border-bottom-color: var(--accent-line);
+  background: linear-gradient(90deg, #080c1d, #151025 70%, #0c1825);
+  box-shadow: 0 2px 24px var(--accent-dim);
+}
+html.cyberpunk-philou .brand {
+  color: var(--cyan);
+  letter-spacing: 0.08em;
+}
+html.cyberpunk-philou .sidebar {
+  border-right-color: var(--accent-line);
+}
+html.cyberpunk-philou .sidebar button.active {
+  box-shadow: inset 3px 0 var(--cyan), 0 0 12px var(--cyan-dim);
+}
+.philou-mission-control {
+  border: 1px solid var(--accent-line);
+}
+.philou-mission-control .bgs-actions {
+  align-items: center;
+}
+.philou-mission-control input {
+  min-width: min(260px, 100%);
+  flex: 1 1 230px;
+}
+.philou-mission-control [role="status"] {
+  overflow-wrap: anywhere;
+}

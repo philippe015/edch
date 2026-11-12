@@ -92,7 +92,7 @@ function render() {
           ? h("button.primary.small", { onclick: () => download(p.info) }, t("updater.update"))
           : h(
               "button.primary.small",
-              { onclick: () => openUrl(p.info.page || "https://github.com/BKNadir/edch/releases/latest") },
+              { onclick: () => openUrl(p.info.page || "https://github.com/philippe015/edch/releases/latest") },
               mode === "portable" ? t("updater.downloadPortableVersion") : t("updater.downloadNewVersion"),
             ),
       ),

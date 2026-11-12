@@ -48,8 +48,8 @@ export function renderHeader(el: HTMLElement, ctx: Ctx) {
     h(
       "button.brand",
       { title: t("main.hideShowMenu"), onclick: () => toggleNav() },
-      h("img", { src: "favicon.png", alt: "" }),
-      h("span", null, "EDCH"),
+      h("strong.cp-mark", { "aria-hidden": "true" }, "CP"),
+      h("span", null, "Cyberpunk Philou"),
     ),
     h(
       "div.cmdr",
