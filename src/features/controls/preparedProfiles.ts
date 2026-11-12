@@ -3,7 +3,8 @@
  * Only known Odyssey action IDs may be edited; the original .binds is never touched.
  */
 import { type Bind, type BindsMeta, groupOf } from "./binds.js";
-import { bindingKey, type PresetAssignment } from "./presetAdvisor.js";
+import { type PresetAssignment } from "./presetAdvisor.js";
+import { approvedPreparedKey } from "./preparedKeys.js";
 import { scopeForGroup, type GameScope, type Usage } from "./scopedProfiles.js";
 
 export interface KeyRule { action:string; key:string }
@@ -131,17 +132,6 @@ export const PREPARED_TEMPLATES:readonly PreparedTemplate[] = [
      {action:"HumanoidToggleFlashlightButton",key:"Key_F"},
      {action:"HumanoidToggleNightVisionButton",key:"Key_N"}]},
 ];
-
-export const keysApprovedForPreparation = ():readonly string[] => Object.freeze([
-  "Key_Z","Key_S","Key_Q","Key_D","Key_R","Key_F","Key_J","Key_L",
-  "Key_H","Key_T","Key_M","Key_N","Key_V","Key_Y","Key_C","Key_U",
-  "Key_B","Key_E","Key_G","Key_X","Key_Space","Key_Tab",
-  "Key_LeftShift","Key_LeftControl",
-]);
-const APPROVED = new Set(keysApprovedForPreparation());
-export function approvedPreparedKey(device:string,key:string,modifiers:readonly unknown[]):boolean {
-  return device==="Keyboard" && APPROVED.has(key) && modifiers.length===0;
-}
 
 function byKey(a: Pick<Bind,"device"|"key"|"modifiers">, key:string):boolean {
   return a.device==="Keyboard" && a.key===key && a.modifiers.length===0;
