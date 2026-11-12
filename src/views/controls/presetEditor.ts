@@ -6,7 +6,7 @@ import { localizedActionLabel} from "../../features/controls/actionLabels.js";
 import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
-  recommendProfile, type ControlTab, type PresetAssignment, type SuggestedProfile,
+  recommendProfile, type PresetAssignment, type SuggestedProfile,
 } from "../../features/controls/presetAdvisor.js";
 import { h } from "../../ui/dom.js";
 import {
