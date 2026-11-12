@@ -43,13 +43,13 @@ import { keyboard } from "./keyboard.js";
 import { OnFootEditor } from "./footEditor.js"; // EDCH-ONFOOT-EDIT-v1.4.4
 import { ControlsProPanel } from "./proPanel.js"; // EDCH-COMMANDES-PRO-v1.6.4
 import { ControlsPresetEditor } from "./presetEditor.js"; // EDCH-COMMANDES-JEU-v1.6.5
+import { type GameScope } from "../../features/controls/scopedProfiles.js";
 
-const MODES: [string, string, string[] | null][] = [
-  ["all", t("controls.all"), null],
-  ["ship", t("common.ship"), ["Ship", "Fighter", "Scanners", "Multicrew"]],
-  ["srv", "SRV", ["SRV"]],
-  ["foot", t("common.foot"), ["OnFoot", "Holo-Me"]],
-  ["ui", t("controls.mapsUi"), ["Galaxy map", "UI", "Camera", "Head look", "Misc"]],
+// Exactly three primary tabs. Advanced UI/map and reports remain accessible below.
+const MODES: [GameScope, string, string[]][] = [
+  ["ship", "Vaisseau", ["Ship", "Fighter", "Scanners", "Multicrew"]],
+  ["srv", "SRV / VRS", ["SRV"]],
+  ["foot", "À pied", ["OnFoot", "Holo-Me"]],
 ];
 
 let metaPromise: Promise<BindsMeta> | undefined;
@@ -77,7 +77,7 @@ export class ControlsView implements View {
       return {};
     }
   })();
-  private mode = "all";
+  private mode:GameScope = "ship";
   private query = "";
   private body = h("div.controls-body");
   private backupOut = h("div.backup-out");
@@ -91,7 +91,6 @@ export class ControlsView implements View {
     replace(
       root,
       h("header.view-head", null, h("h1", null, t("controls.controlsDevices"))),
-      this.backupCard(),
       this.body,
     );
     replace(this.body, h("p.sub", null, h("span.spinner"), " " + t("controls.readingBindings")));
@@ -263,9 +262,9 @@ export class ControlsView implements View {
 
   private render() {
     const meta = this.meta!;
-    const devices = [...new Set(this.binds.map((b) => b.device))].sort((a, b) => rank(meta, a) - rank(meta, b));
-    if (!devices.includes(this.device)) this.device = devices[0] ?? "";
     const binds = this.visible();
+    const devices = [...new Set(binds.map((b) => b.device))].sort((a, b) => rank(meta, a) - rank(meta, b));
+    if (!devices.includes(this.device)) this.device = devices[0] ?? "";
     const mine = binds.filter((b) => b.device === this.device);
     const repeated = repeatedAssignments(meta, mine);
 
@@ -317,10 +316,20 @@ export class ControlsView implements View {
         fileSelect,
         languageSelect,
         h(
-          "div.segmented",
-          null,
+          "div.segmented.edch-main-context-tabs",
+          { role: "tablist", "aria-label": "Vaisseau, SRV et À pied" },
           MODES.map(([m, l]) =>
-            h("button", { class: this.mode === m ? "active" : "", onclick: () => ((this.mode = m), this.render()) }, l),
+            h("button", {
+              type:"button", role:"tab","aria-selected":this.mode===m,
+              class:this.mode===m?"active":"",
+              onclick:()=>{
+                if(this.mode===m) return;
+                if(this.presetEditor.hasDraft() && !window.confirm("Changer d'onglet et abandonner le brouillon non enregistré ?")) return;
+                this.mode=m;
+                this.query="";
+                this.render();
+              },
+            },l),
           ),
         ),
         h(
@@ -343,8 +352,8 @@ export class ControlsView implements View {
         h("button.ghost", { onclick: () => window.print() }, t("controls.printSheet")),
       ),
       this.note ? h("p.notice", null, icon("warn"), ` ${this.note}`) : null,
-      this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
-      this.presetEditor.render(meta, this.files, this.chosen, async () => this.refreshBindings()),
+      h("p.sub", null, "Configuration par contexte : Vaisseau, SRV / VRS ou À pied. Choisis ensuite Clavier AZERTY, HOTAS ou Manette Xbox et un profil conseillé."),
+      this.presetEditor.render(meta, this.files, this.chosen || fileForPreset(this.presets[this.mode==="ship"?1:this.mode==="srv"?2:3] ?? "", this.files.map(f=>f.name)) || "", async () => this.refreshBindings(), this.mode),
       // EDCH-ONFOOT-EDIT-v1.4.4: edit and save a separate Odyssey keyboard-only preset.
       this.mode === "foot"
         ? this.onFootEditor.render(
@@ -360,6 +369,12 @@ export class ControlsView implements View {
             },
           )
         : null,
+      h("details.controls-advanced",null,
+        h("summary",null,"Affichage des touches, diagnostics et sauvegardes avancés"),
+        this.commandesPro.render(meta, this.binds, this.files, this.chosen || this.presets.join(" / ") || "Profil actif"),
+        this.backupCard(),
+        h("p.sub",null,"Interface / cartes : les commandes restent présentes dans le profil .binds et sont consultables via les diagnostics avancés."),
+      ),
       devices.length
         ? h(
             "div.device-tabs",

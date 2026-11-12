@@ -4,7 +4,7 @@
  */
 import type { Bind } from "../../features/controls/binds.js";
 import {
-  gameJoystickCandidates, isX52Device, x52BindingSummary,
+  gameJoystickCandidates, isSupportedHotasDevice, x52BindingSummary,
   type CandidateMapping, type PhysicalHotasDevice, type PhysicalHotasEvent,
 } from "../../features/controls/hotasMapping.js";
 import { hotasCapture, hotasDevices, isRemote, isTauri } from "../../platform/bridge.js";
@@ -25,7 +25,7 @@ export class HotasStudio {
     this.context = { binds, onPick };
     const enabled = isTauri() && !isRemote();
     if (enabled && !this.scanned && !this.scanning) void this.scan();
-    const x52 = this.devices.filter(isX52Device);
+    const x52 = this.devices.filter(isSupportedHotasDevice);
     if (this.devices.length && !this.devices.some(d => d.id === this.chosen)) this.chosen = x52[0]?.id ?? this.devices[0].id;
     const device = this.devices.find(d => d.id === this.chosen);
     const summary = x52BindingSummary(binds);
@@ -44,7 +44,7 @@ export class HotasStudio {
       h("div.edch-hotas-hardware", null,
         h("div.edch-hotas-stick", { "aria-hidden": "true" },
           h("span.edch-hotas-stick-handle"), h("span.edch-hotas-stick-base")),
-        h("strong", null, "Joystick X52 Pro"),
+        h("strong", null, "Joystick HOTAS X52 Pro / X56"),
         h("small", null, `${summary.buttons} bouton(s) identifié(s) dans le .binds`)),
       h("div.edch-hotas-hardware", null,
         h("div.edch-hotas-throttle", { "aria-hidden": "true" },
@@ -74,13 +74,13 @@ export class HotasStudio {
         matches.length ? h("div", null,
           label("Correspondances candidates dans le profil du jeu. Linux et Proton peuvent numéroter différemment : vérifie le bouton avant d'utiliser une proposition."),
           ...candidateRows,
-        ) : label("Aucune correspondance X52 Pro vérifiable dans le .binds source : aucune touche n'est choisie automatiquement."),
+        ) : label("Aucune correspondance HOTAS vérifiable dans le .binds source : aucune touche n'est choisie automatiquement."),
     ) : null;
     this.host = h("section.card.edch-hotas-v167", null,
       h("div.edch-hotas-heading", null,
         h("div", null, h("p.edch-c166-eyebrow", null, "PÉRIPHÉRIQUE PHYSIQUE · MANJARO"),
           h("h3", null, "HOTAS Studio · v1.6.7")),
-        h("span.edch-c166-chip", null, x52.length ? "X52 Pro repéré" : this.scanning ? "Recherche…" : "X52 Pro non confirmé")),
+        h("span.edch-c166-chip", null, x52.length ? "HOTAS X52/X56 repéré" : this.scanning ? "Recherche…" : "HOTAS non confirmé")),
       layout,
       label("Schéma indicatif : les zones joystick/manette des gaz et les nombres proviennent du profil, pas d'un relevé détaillé des boutons physiques."),
       enabled ? (this.devices.length ? deviceList : label("Aucun /dev/input/jsN détecté. Vérifie la connexion USB et le module Linux joydev."))

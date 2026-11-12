@@ -27,23 +27,28 @@ export interface CandidateMapping {
 export function isX52Device(device: Pick<PhysicalHotasDevice, "name">): boolean {
   return /\bx\s*-?\s*52\b/i.test(device.name);
 }
+/** Both families are recognized, but Linux button indices are still unverified. */
+export function isSupportedHotasDevice(device: Pick<PhysicalHotasDevice, "name">): boolean {
+  return /\bx\s*-?\s*(?:52|56)\b/i.test(device.name);
+}
 
 export function gameJoystickCandidates(
   event: PhysicalHotasEvent,
   binds: readonly Bind[],
   physical: PhysicalHotasDevice,
 ): CandidateMapping[] {
-  if (event.kind !== "button" || event.value !== 1 || event.deviceId !== physical.id || !isX52Device(physical)) return [];
+  if (event.kind !== "button" || event.value !== 1 || event.deviceId !== physical.id || !isSupportedHotasDevice(physical)) return [];
   if (!Number.isSafeInteger(event.inputIndex) || event.inputIndex < 0 || event.inputIndex > 255) return [];
   const possibilities: { key: string; offset: 0 | 1 }[] = [
     { key: `Joy_${event.inputIndex}`, offset: 0 },
     { key: `Joy_${event.inputIndex + 1}`, offset: 1 },
   ];
+  const expectedFamily = isX52Device(physical) ? /x52/i : /x56/i;
   const seen = new Set<string>();
   const out: CandidateMapping[] = [];
   for (const candidate of possibilities) {
     for (const binding of binds) {
-      if (!/x52|saitek/i.test(binding.device) || binding.key !== candidate.key || binding.slot === "axis" || binding.modifiers.length) continue;
+      if (!expectedFamily.test(binding.device) || binding.key !== candidate.key || binding.slot === "axis" || binding.modifiers.length) continue;
       const unique = JSON.stringify([binding.device, binding.key]);
       if (seen.has(unique)) continue;
       seen.add(unique);
@@ -54,7 +59,7 @@ export function gameJoystickCandidates(
 }
 
 export function x52BindingSummary(binds: readonly Bind[]): { buttons: number; axes: number; actions: number } {
-  const entries = binds.filter(b => /x52|saitek/i.test(b.device));
+  const entries = binds.filter(b => /x52|x56|saitek/i.test(b.device));
   return {
     buttons: new Set(entries.filter(b => b.slot !== "axis" && !/axis/i.test(b.key)).map(b => `${b.device}:${b.key}`)).size,
     axes: new Set(entries.filter(b => b.slot === "axis" || /axis/i.test(b.key)).map(b => `${b.device}:${b.key}`)).size,

@@ -81,3 +81,16 @@
 .edch-hotas-candidate{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px;border-bottom:1px solid #405161}
 .edch-hotas-candidate span{font-size:.85rem}
 @media(max-width:710px){.edch-hotas-visuals{grid-template-columns:1fr}.edch-hotas-v167{padding:12px}.edch-hotas-candidate{flex-direction:column;align-items:stretch}}
+
+/* EDCH v1.6.10 — three clearly separated game contexts and peripheral selection. */
+.edch-main-context-tabs{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin:8px 0}
+.edch-main-context-tabs button{flex:1 1 130px;min-height:44px;padding:10px 16px!important;border:1px solid #546576!important;border-radius:8px!important;background:#192833!important;color:#deecf6!important;font-size:.96rem!important;font-weight:700;cursor:pointer}
+.edch-main-context-tabs button:hover{background:#283a48!important}
+.edch-main-context-tabs button.active,.edch-main-context-tabs button[aria-selected="true"]{background:#58341a!important;color:#ffd3a2!important;border:2px solid #f69a35!important}
+.controls-advanced{margin:14px 0;padding:10px 13px;border:1px solid #435568;border-radius:8px;background:#18222b}
+.controls-advanced>summary{cursor:pointer;padding:10px 3px;font-weight:700;color:#e0ebf4}
+.controls-advanced[open]>summary{border-bottom:1px solid #4c6072;margin-bottom:12px}
+.edch-controls-write-v166 .edch-c166-tabs{gap:7px}
+.edch-controls-write-v166 .edch-c166-tabs button{border:1px solid #536679;border-radius:6px;margin-bottom:7px;padding:10px 13px;font-weight:650}
+.edch-controls-write-v166 .edch-c166-tabs button.active{background:#4d301a;border-color:#ee8f32}
+@media(max-width:650px){.edch-main-context-tabs button{flex-basis:100px;font-size:.88rem!important}.edch-controls-write-v166 .edch-c166-tabs button{flex:1}}
