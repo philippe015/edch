@@ -166,6 +166,7 @@ export class ControlsPresetEditor {
           const changes=prepared?.changes??inferred?.changes??[];
           const covered=prepared?.covered??inferred?.covered??0;
           const skipped=prepared?.skipped.length??inferred?.absent.length??0;
+          const replacements=changes.filter(c=>c.replaceExisting).length;
           const detail=this.family==="azerty"
             ?template.description
             :"Utilise les boutons déjà présents dans le profil "+(this.family==="hotas"?"X52 Pro / HOTAS":"Xbox")+". Aucun bouton inventé.";
@@ -175,7 +176,7 @@ export class ControlsPresetEditor {
               selected?h("span",null,"Sélectionné"):null),
             h("p",null,detail),
             h("p.edch-c1612-preview",null,
-              src?`${covered} déjà conforme(s) · ${changes.length} modification(s) préparée(s) · ${skipped} ignorée(s)`:
+              src?`${covered} déjà conforme(s) · ${changes.length} proposition(s), dont ${replacements} remplacement(s) · ${skipped} ignorée(s)`:
                 "Sélectionne un .binds personnel pour voir les affectations."),
             h("button",{type:"button",disabled:!src||this.saving||this.loading,
               onclick:()=>{
@@ -208,7 +209,9 @@ export class ControlsPresetEditor {
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
         h("span",null,h("strong",null,localizedActionLabel(meta,change.action)),
-          h("small",null,`${labelSlot(change.slot)} → ${change.device} ${change.key}`)),
+          h("small",null,change.replaceExisting
+            ?`${labelSlot(change.slot)} : ${readKey(src?.binds.find(b=>b.action===change.action&&b.slot===change.slot))} → ${change.device} : ${change.key} (remplacement dans le NOUVEAU profil)`
+            :`${labelSlot(change.slot)} : libre → ${change.device} : ${change.key}`)),
         btn("Retirer",()=>{this.staged.splice(index,1);this.acknowledgeWarnings=false;this.repaint();})))):
         h("p.edch-c166-muted",null,"Aucune modification préparée. Ton profil original est conservé."),
       editsWarnings.length?h("div.edch-c166-warning",null,
