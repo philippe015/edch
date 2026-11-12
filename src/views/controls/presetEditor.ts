@@ -55,7 +55,11 @@ export class ControlsPresetEditor {
 
   render(meta:BindsMeta, files:OptionFile[], active:string, reload:()=>Promise<void>, scope:GameScope=this.mode):HTMLElement {
     this.context={meta,files,active,reload};
-    if(this.mode!==scope){this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;this.editAction="";this.message="";}
+    if(this.mode!==scope){
+      this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;
+      this.editAction="";this.message="";
+      this.selected=active;this.source=undefined;this.attempted="";this.editInput="";
+    }
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
       .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
