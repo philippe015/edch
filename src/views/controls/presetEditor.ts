@@ -13,6 +13,7 @@ import {
   detectedInputs, GAME_SCOPES, INPUT_FAMILIES, recommendScopedProfile, scopedInputWarnings, USAGE_STYLES,
   type GameScope, type InputFamily,
 } from "../../features/controls/scopedProfiles.js";
+import { GAME_SECTIONS, PREPARED_TEMPLATES, prepareAzerty, sectionForAction } from "../../features/controls/preparedProfiles.js";
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 
@@ -39,6 +40,7 @@ export class ControlsPresetEditor {
   private mode:GameScope="ship";
   private family:InputFamily="azerty";
   private query="";
+  private section="all";
   private profile:SuggestedProfile="balanced";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
@@ -57,7 +59,7 @@ export class ControlsPresetEditor {
     this.context={meta,files,active,reload};
     if(this.mode!==scope){
       this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;
-      this.editAction="";this.message="";
+      this.editAction="";this.message="";this.section="all";
       this.selected=active;this.source=undefined;this.attempted="";this.editInput="";
     }
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
@@ -70,7 +72,8 @@ export class ControlsPresetEditor {
     const src=this.source?.filename===this.selected?this.source:undefined;
     const inputs=src?detectedInputs(src.binds,this.family,meta):[];
     const deviceAdvice=src?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
-    const rows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
+    const allRows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
+    const rows=this.section==="all" ? allRows : allRows.filter(row=>sectionForAction(this.mode,row.action,meta)===this.section);
     if (src && this.editAction && !src.actions.includes(this.editAction)) this.editAction="";
     if (!inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=inputs.length?bindingKey(inputs[0]):"";
     const editsWarnings=src?[...new Set([...occupancyWarnings(src.binds,this.staged,meta),
@@ -87,7 +90,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes · configuration simplifiée v1.6.10"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils préparés v1.6.12"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -117,6 +120,16 @@ export class ControlsPresetEditor {
     ),
     rows.length>200?h("p.edch-c166-muted",null,`200 sur ${rows.length} commandes affichées : affine la recherche.`):null,
     !rows.length?h("p.edch-c166-muted",null,"Aucune commande pour cette recherche."):null);
+    const sectionTabs=h("div.edch-c1612-sections",{role:"group","aria-label":"Catégories des commandes Elite Dangerous"},
+      h("button",{type:"button",class:this.section==="all"?"active":"",
+        onclick:()=>{this.section="all";this.repaint();}},`Toutes · ${allRows.length}`),
+      ...GAME_SECTIONS[this.mode].map(category=>{
+        const count=allRows.filter(row=>sectionForAction(this.mode,row.action,meta)===category.id).length;
+        return h("button",{type:"button",class:this.section===category.id?"active":"",
+          "aria-pressed":this.section===category.id,
+          onclick:()=>{this.section=category.id;this.repaint();}},
+          `${category.label} · ${count}`);
+      }));
     const currentContext=GAME_SCOPES.find(x=>x.id===this.mode)!;
     const rowPane=h("section.edch-c166-pane.edch-c166-list",null,
       h("div.edch-c166-section-title",null,h("h4",null,currentContext.label),
@@ -124,7 +137,7 @@ export class ControlsPresetEditor {
       h("p.edch-c166-muted",null,currentContext.description),
       h("h4",null,"Choisir le périphérique"),topTabs,
       h("p.edch-c166-muted",null,`${inputs.length} entrée(s) de ce type réellement présentes dans le fichier source.`),
-      search,table);
+      sectionTabs,search,table);
     const chooseInput=h("select",{value:this.editInput,disabled:this.saving||!src,
       onchange:(e:Event)=>{this.editInput=(e.target as HTMLSelectElement).value;this.repaint();}},...inputs.map(i=>choose(readKey(i),bindingKey(i),this.editInput===bindingKey(i))));
     const editBox=h("section.edch-c166-pane",null,
@@ -137,6 +150,50 @@ export class ControlsPresetEditor {
           this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
         btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
       ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
+    // Ready-made profiles: keyboard templates use curated printed AZERTY keys.
+    // HOTAS/Xbox recommendations only reuse buttons observed in the source .binds.
+    const quickCards=h("section.edch-c1612-prepared",{role:"region","aria-label":"Profils préparés Elite Dangerous"},
+      h("div.edch-c1612-prepared-head",null,
+        h("h4",null,"Profils préparés · "+currentContext.label),
+        h("p.edch-c166-muted",null,"Choisis un style. L'aperçu est modifiable et n'écrase jamais le profil d'origine.")),
+      h("div.edch-c1612-profile-grid",null,
+        ...USAGE_STYLES.map(style=>{
+          const template=PREPARED_TEMPLATES.find(t=>t.scope===this.mode&&t.usage===style.id)!;
+          const prepared=src&&this.family==="azerty"
+            ?prepareAzerty(this.mode,style.id,src.actions,src.binds,meta):undefined;
+          const inferred=src&&this.family!=="azerty"
+            ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
+          const changes=prepared?.changes??inferred?.changes??[];
+          const covered=prepared?.covered??inferred?.covered??0;
+          const skipped=prepared?.skipped.length??inferred?.absent.length??0;
+          const detail=this.family==="azerty"
+            ?template.description
+            :"Utilise les boutons déjà présents dans le profil "+(this.family==="hotas"?"X52 Pro / HOTAS":"Xbox")+". Aucun bouton inventé.";
+          const selected=style.id===this.profile;
+          return h("article.edch-c1612-profile",{class:selected?"active":""},
+            h("div.edch-c1612-profile-title",null,h("strong",null,template.label),
+              selected?h("span",null,"Sélectionné"):null),
+            h("p",null,detail),
+            h("p.edch-c1612-preview",null,
+              src?`${covered} déjà conforme(s) · ${changes.length} modification(s) préparée(s) · ${skipped} ignorée(s)`:
+                "Sélectionne un .binds personnel pour voir les affectations."),
+            h("button",{type:"button",disabled:!src||this.saving||this.loading,
+              onclick:()=>{
+                this.profile=style.id;
+                if(changes.length)this.stageAdvice({changes});
+                else{
+                  this.message=this.family==="azerty"
+                    ?"Ce profil est déjà conforme ou les touches proposées sont occupées. Aucune modification appliquée."
+                    :"Aucun bouton vérifié ne peut être proposé pour ce périphérique. Configure-le d'abord dans Elite Dangerous.";
+                  this.repaint();
+                }
+              }},`Préparer · ${style.label}`));
+        }),
+      ),
+      this.family==="azerty"
+        ?h("p.edch-c166-muted",null,"Ces profils AZERTY sont des propositions Cyberpunk Philou, pas les réglages officiels par défaut. Les touches occupées peuvent être ignorées ; vérifie toujours le brouillon.")
+        :h("p.edch-c166-muted",null,"X52 Pro/Xbox : les axes restent inchangés. Seules les affectations réellement reconnues dans le profil source peuvent être reprises."),
+    );
     const adviceBox=h("section.edch-c166-pane",null,
       h("h4",null,"Profils intelligents · "+INPUT_FAMILIES.find(x=>x.id===this.family)!.label),
       h("p.edch-c166-muted",null,"Suggestions locales et vérifiables pour "+currentContext.label+". Aucun numéro HOTAS ou Xbox n'est inventé."),
@@ -195,6 +252,7 @@ export class ControlsPresetEditor {
       src && this.family==="azerty" && !/^(fr|nl-BE)(-|$)/i.test(src.keyboardLayout)
         ? h("p.edch-c166-warning",null,"Le jeu indique le clavier "+src.keyboardLayout+". Vérifie AZERTY avant de valider.") : null,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
+      quickCards,
       h("div.edch-c166-layout",null,rowPane,right),
       modeProfiles,
       h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
