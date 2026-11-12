@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-const REPO: &str = "BKNadir/edch";
+const REPO: &str = "philippe015/edch";
 
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
