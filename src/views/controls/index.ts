@@ -316,8 +316,8 @@ export class ControlsView implements View {
         fileSelect,
         languageSelect,
         h(
-          "div.segmented",
-          null,
+          "div.segmented.edch-main-context-tabs",
+          { role: "tablist", "aria-label": "Vaisseau, SRV et À pied" },
           MODES.map(([m, l]) =>
             h("button", {
               type:"button", role:"tab","aria-selected":this.mode===m,
