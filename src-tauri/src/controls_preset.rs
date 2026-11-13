@@ -1,7 +1,7 @@
 //! EDCH v1.6.5: explicit, safe, offline creation of a new game-readable Odyssey .binds preset.
 //! Never injects input into the game, changes StartPreset or overwrites any existing file.
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fs::{self, OpenOptions}, io::Write, path::Path};
+use std::{collections::HashSet, fs::{self, OpenOptions}, io::Write, path::{Path,PathBuf}, time::{SystemTime,UNIX_EPOCH}};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all="camelCase")]
@@ -198,8 +198,8 @@ pub async fn controls_save_preset(source_file: String, change: ControlsChange) -
 
 /// Safely applies a reviewed list of changes to ONE new profile. Never edits the source.
 fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Result<String, String> {
-    if changes.is_empty() || changes.len() > 40 {
-        return Err("between 1 and 40 confirmed changes required".into());
+    if changes.is_empty() || changes.len() > 96 {
+        return Err("between 1 and 96 confirmed changes required".into());
     }
     let mut used = HashSet::new();
     // Validate against the unchanged source before rewriting any slot.
@@ -228,7 +228,7 @@ pub async fn controls_save_preset_batch(
         return Err("Close Elite Dangerous and launcher before generating a profile".into());
     }
     if !filename_valid(&source_file) { return Err("invalid source filename".into()); }
-    if changes.is_empty() || changes.len() > 40 { return Err("1–40 changes required".into()); }
+    if changes.is_empty() || changes.len() > 96 { return Err("1–96 changes required".into()); }
     let base = Path::new(&crate::options::options_dir()?).join("Bindings");
     let path = base.join(&source_file);
     let meta = fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
@@ -267,6 +267,166 @@ pub async fn controls_save_preset_batch(
     Err("EDCHPro profile namespace full".into())
 }
 
+/// User-facing named presets avoid EDCHPro001, EDCHPro002... accumulation.
+ /// Only names in EDCH_* namespace may be created or explicitly updated.
+fn safe_named_preset(name: &str) -> bool {
+    name.starts_with("EDCH_") && name.len() <= 40 && name.len() >= 6 &&
+      name.bytes().all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
+}
+fn set_french_keyboard_layout(xml: &str) -> Result<String, String> {
+    let open = "<KeyboardLayout>";
+    let close = "</KeyboardLayout>";
+    let from = xml.find(open).ok_or("source has no KeyboardLayout tag")? + open.len();
+    let end = from + xml[from..].find(close).ok_or("malformed KeyboardLayout")?;
+    Ok(format!("{}fr-FR{}", &xml[..from], &xml[end..]))
+}
+/// Validate the exact output before saving. It is not enough to trust a successful write.
+fn verify_named_output(xml: &str, preset: &str, changes: &[ControlsChange]) -> Result<(), String> {
+    let open = xml.find("<Root ").ok_or("Root missing after rewrite")?;
+    let end = open + xml[open..].find('>').ok_or("Root malformed after rewrite")? + 1;
+    if attr(&xml[open..end], "PresetName").as_deref() != Some(preset) {
+        return Err("output PresetName does not match filename".into());
+    }
+    for change in changes {
+        let start_tag = format!("<{}>", change.action);
+        let close_tag = format!("</{}>", change.action);
+        let start = xml.find(&start_tag).ok_or("output action missing")? + start_tag.len();
+        let end = start + xml[start..].find(&close_tag).ok_or("output action not closed")?;
+        let body = &xml[start..end];
+        let slot = if change.slot == "primary" {"Primary"} else {"Secondary"};
+        let at = body.find(&format!("<{slot} ")).ok_or("output input slot missing")?;
+        let tag_end = at + body[at..].find('>').ok_or("output input malformed")? + 1;
+        let tag = &body[at..tag_end];
+        if attr(tag,"Device").as_deref()!=Some(change.device.as_str())
+          || attr(tag,"Key").as_deref()!=Some(change.key.as_str()) {
+            return Err(format!("output key differs from planned assignment for {}",change.action));
+        }
+    }
+    Ok(())
+}
+fn named_xml(source: &str, name: &str, changes: &[ControlsChange], french: bool) -> Result<String,String> {
+    if !safe_named_preset(name) || changes.is_empty() || changes.len()>96 {
+        return Err("invalid named preset or action count (1–96)".into());
+    }
+    let result = rewrite_xml_batch(source,name,changes)?;
+    let result = if french {set_french_keyboard_layout(&result)?} else {result};
+    verify_named_output(&result,name,changes)?;
+    if result.len()>5_000_000 {return Err("named profile too large".into());}
+    Ok(result)
+}
+fn owned_named_file(path: &Path, preset: &str) -> Result<(), String> {
+    let info=fs::symlink_metadata(path).map_err(|e|e.to_string())?;
+    if info.file_type().is_symlink() || !info.file_type().is_file() || info.len()>5_000_000 {
+        return Err("existing named profile is unsafe, not a regular file or too large".into());
+    }
+    let data=fs::read_to_string(path).map_err(|e|e.to_string())?;
+    let at=data.find("<Root ").ok_or("existing named profile has no Root")?;
+    let end=at+data[at..].find('>').ok_or("malformed Root")?+1;
+    let root=&data[at..end];
+    if attr(root,"PresetName").as_deref()!=Some(preset)
+      || attr(root,"MajorVersion").as_deref()!=Some("4") {
+      return Err("existing file is not the requested EDCH profile; refusing overwrite".into());
+    }
+    Ok(())
+}
+fn unique_update_paths(base: &Path, preset: &str) -> Result<(PathBuf,PathBuf),String> {
+    let backups=base.join("EDCH_Backups");
+    if !backups.exists() {fs::create_dir(&backups).map_err(|e|e.to_string())?;}
+    let info=fs::symlink_metadata(&backups).map_err(|e|e.to_string())?;
+    if info.file_type().is_symlink() || !info.file_type().is_dir() {
+        return Err("backup folder is not a real directory".into());
+    }
+    let tick=SystemTime::now().duration_since(UNIX_EPOCH)
+       .map_err(|e|e.to_string())?.as_micros();
+    for attempt in 0..100u32 {
+        let temporary=base.join(format!(".EDCH_{preset}_{tick}_{attempt}.tmp"));
+        let backup=backups.join(format!("{preset}_{tick}_{attempt}.binds.bak"));
+        if !temporary.exists()&&!backup.exists(){return Ok((temporary,backup));}
+    }
+    Err("cannot allocate unique EDCH temporary/backup paths".into())
+}
+/// Create or intentionally update ONE stable, named preset. Updating archives the previous
+/// EDCH-owned .binds before replacing it. Never touches Custom, HOTAS or EDCHPro legacy files.
+#[tauri::command]
+pub async fn controls_save_named_preset_batch(
+    source_file: String,
+    changes: Vec<ControlsChange>,
+    preset_name: String,
+    update_existing: bool,
+    french_azerty: bool,
+) -> Result<ControlsPresetResult,String> {
+    if !crate::app::game_running().await.is_empty() {
+        return Err("Close Elite Dangerous and its launcher before updating presets".into());
+    }
+    if !safe_named_preset(&preset_name) || !filename_valid(&source_file) {
+        return Err("invalid profile name: expected EDCH_UPPERCASE_UNDERSCORES".into());
+    }
+    if changes.is_empty() || changes.len()>96 {return Err("1–96 reviewed changes required".into());}
+    let base=Path::new(&crate::options::options_dir()?).join("Bindings");
+    let source_path=base.join(&source_file);
+    let meta=fs::symlink_metadata(&source_path).map_err(|e|e.to_string())?;
+    if !meta.file_type().is_file() || meta.file_type().is_symlink() || meta.len()>5_000_000 {
+        return Err("invalid, symlink or oversized source .binds".into());
+    }
+    let xml=fs::read_to_string(&source_path).map_err(|e|e.to_string())?;
+    let at=xml.find("<Root ").ok_or("Root missing")?;
+    let end=at+xml[at..].find('>').ok_or("malformed Root")?+1;
+    let root=&xml[at..end];
+    let major=attr(root,"MajorVersion").ok_or("version missing")?;
+    let minor=attr(root,"MinorVersion").ok_or("minor version missing")?;
+    if major!="4" || minor.len()>2 || minor.is_empty() ||
+      !minor.bytes().all(|b|b.is_ascii_digit()) {
+        return Err("unsupported Odyssey .binds version".into());
+    }
+    let filename=format!("{preset_name}.{major}.{minor}.binds");
+    let destination=base.join(&filename);
+    // Avoid duplicate in-game dropdown entries due to files with the same Root PresetName
+    // but different Odyssey minor versions.
+    for item in fs::read_dir(&base).map_err(|e|e.to_string())? {
+        let item=item.map_err(|e|e.to_string())?;
+        let file=item.file_name().to_string_lossy().into_owned();
+        if file.starts_with(&format!("{preset_name}.")) && file.ends_with(".binds")
+          && file!=filename {
+            return Err(format!("Another Odyssey version of {preset_name} already exists: {file}. Archive it explicitly first."));
+        }
+    }
+    let output=named_xml(&xml,&preset_name,&changes,french_azerty)?;
+    let destination_exists=destination.exists() || fs::symlink_metadata(&destination).is_ok();
+    if !destination_exists {
+        let mut out=OpenOptions::new().write(true).create_new(true).open(&destination)
+          .map_err(|e|e.to_string())?;
+        if let Err(e)=out.write_all(output.as_bytes()).and_then(|_|out.sync_all()) {
+            drop(out);let _=fs::remove_file(&destination);
+            return Err(e.to_string());
+        }
+    } else {
+        if !update_existing {return Err(format!("{preset_name} already exists. Confirm update and backup in EDCH."));}
+        owned_named_file(&destination,&preset_name)?;
+        let (temp,backup)=unique_update_paths(&base,&preset_name)?;
+        let mut staged=OpenOptions::new().write(true).create_new(true).open(&temp)
+          .map_err(|e|e.to_string())?;
+        if let Err(e)=staged.write_all(output.as_bytes()).and_then(|_|staged.sync_all()) {
+            drop(staged);let _=fs::remove_file(&temp);return Err(e.to_string());
+        }
+        drop(staged);
+        // Rename the original to the backup directory before making the new file visible.
+        if let Err(e)=fs::rename(&destination,&backup){
+            let _=fs::remove_file(&temp);return Err(format!("backup failed: {e}"));
+        }
+        if let Err(e)=fs::rename(&temp,&destination){
+            let restore=fs::rename(&backup,&destination);
+            let _=fs::remove_file(&temp);
+            return Err(format!("update failed: {e}; restore previous file: {restore:?}"));
+        }
+    }
+    // Ensure bytes on disk match all proposed settings, not only the in-memory output.
+    let written=fs::read_to_string(&destination).map_err(|e|e.to_string())?;
+    verify_named_output(&written,&preset_name,&changes)?;
+    if french_azerty && !written.contains("<KeyboardLayout>fr-FR</KeyboardLayout>") {
+        return Err("French AZERTY layout not present in written profile".into());
+    }
+    Ok(ControlsPresetResult{preset:preset_name,filename,path:destination.to_string_lossy().to_string()})
+}
 #[cfg(test)]
 mod tests {
     use super::*;
