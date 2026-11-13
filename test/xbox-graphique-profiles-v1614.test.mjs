@@ -92,7 +92,7 @@ test("intelligent profiles reuse verified peer button first, without changing it
 });
 
 test("known conventional controller button may be recommended only when free",()=>{
-  const src=[b("BuggySecondaryFireButton","Pad_B"),b("HumanoidJumpButton","Pad_A")];
+  const src=[b("HumanoidJumpButton","Pad_B"),b("PrimaryFire","Pad_A")];
   const p=recommendXboxProfile("srv","balanced",Object.keys(md.controls),src,md);
   const brake=p.suggestions.find(x=>x.assignment.action==="AutoBreakBuggyButton");
   assert.equal(brake?.assignment.key,"Pad_B");
