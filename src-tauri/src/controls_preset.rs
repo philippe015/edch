@@ -427,6 +427,107 @@ pub async fn controls_save_named_preset_batch(
     }
     Ok(ControlsPresetResult{preset:preset_name,filename,path:destination.to_string_lossy().to_string()})
 }
+#[derive(Debug,Serialize)]
+pub struct LegacyArchiveResult {
+    pub archived:Vec<String>,
+    pub skipped:Vec<String>,
+    pub backup_dir:String,
+}
+/// Match only the historical EDCHProNNN( N) numbered Odyssey names.
+fn legacy_edch_filename(filename:&str)->Option<String> {
+    let upper=filename.to_ascii_uppercase();
+    let (stem,version)=upper.split_once('.')?;
+    let tail=stem.strip_prefix("EDCHPRO")?;
+    if !(3..=5).contains(&tail.len()) || !tail.bytes().all(|b|b.is_ascii_digit()) {
+        return None;
+    }
+    let parts=version.split('.').collect::<Vec<_>>();
+    if parts.len()!=3 || parts[0]!="4" || parts[2]!="BINDS"
+      || parts[1].is_empty() || parts[1].len()>2 ||
+      !parts[1].bytes().all(|b|b.is_ascii_digit()) {return None;}
+    Some(stem.into())
+}
+/// Explicit, reversible cleanup of unused numeric EDCHPro profiles.
+/// No Custom/HOTAS/Xbox profile may be moved, nor a selected/active EDCHPro profile.
+#[tauri::command]
+pub async fn controls_archive_legacy_presets(selected_file:String)->Result<LegacyArchiveResult,String> {
+    if !crate::app::game_running().await.is_empty(){
+        return Err("Close Elite Dangerous and its launcher before archiving profiles".into());
+    }
+    if !selected_file.is_empty() && !filename_valid(&selected_file){
+        return Err("Invalid selected profile filename".into());
+    }
+    let base=Path::new(&crate::options::options_dir()?).join("Bindings");
+    let mut active=HashSet::<String>::new();
+    let mut found_start=false;
+    for item in fs::read_dir(&base).map_err(|e|e.to_string())? {
+        let entry=item.map_err(|e|e.to_string())?;
+        let name=entry.file_name().to_string_lossy().into_owned();
+        if name.eq_ignore_ascii_case("StartPreset.4.start")||
+            name.eq_ignore_ascii_case("StartPreset.start"){
+            let info=fs::symlink_metadata(entry.path()).map_err(|e|e.to_string())?;
+            if !info.file_type().is_file() || info.file_type().is_symlink()||info.len()>50_000{
+                return Err("Unsafe StartPreset file; refusing archival".into());
+            }
+            found_start=true;
+            for line in fs::read_to_string(entry.path()).map_err(|e|e.to_string())?.lines(){
+                active.insert(line.trim().trim_start_matches('\u{feff}').to_ascii_uppercase());
+            }
+        }
+    }
+    if !found_start {
+        return Err("StartPreset not available: cannot prove which legacy profile is active".into());
+    }
+    let backups=base.join("EDCH_Backups");
+    if !backups.exists(){fs::create_dir(&backups).map_err(|e|e.to_string())?;}
+    let info=fs::symlink_metadata(&backups).map_err(|e|e.to_string())?;
+    if info.file_type().is_symlink()||!info.file_type().is_dir() {
+        return Err("Unsafe EDCH backup folder".into());
+    }
+    let now=SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e|e.to_string())?.as_micros();
+    let mut archived=Vec::<String>::new();
+    let mut skipped=Vec::<String>::new();
+    for item in fs::read_dir(&base).map_err(|e|e.to_string())? {
+        let entry=item.map_err(|e|e.to_string())?;
+        let name=entry.file_name().to_string_lossy().into_owned();
+        let Some(preset)=legacy_edch_filename(&name) else {continue;};
+        if name.eq_ignore_ascii_case(&selected_file)||active.contains(&preset) {
+            skipped.push(format!("{name} : profil utilisé ou sélectionné"));continue;
+        }
+        if archived.len()>=100 {
+            skipped.push("Limit of 100 legacy files reached".into());break;
+        }
+        if let Err(e)=owned_legacy_file(&entry.path(),&preset){
+            skipped.push(format!("{name} : {e}"));continue;
+        }
+        let mut moved=false;
+        for attempt in 0..100u32 {
+            let backup=backups.join(format!("Legacy_{preset}_{now}_{attempt}.binds.bak"));
+            if backup.exists(){continue;}
+            fs::rename(entry.path(),&backup).map_err(|e|format!("Cannot archive {name}: {e}"))?;
+            archived.push(name.clone());moved=true;break;
+        }
+        if !moved{skipped.push(format!("{name} : no unused backup filename"));}
+    }
+    Ok(LegacyArchiveResult{archived,skipped,
+      backup_dir:backups.to_string_lossy().to_string()})
+}
+fn owned_legacy_file(path:&Path,preset:&str)->Result<(),String>{
+    let m=fs::symlink_metadata(path).map_err(|e|e.to_string())?;
+    if m.file_type().is_symlink()||!m.file_type().is_file()||m.len()>5_000_000{
+        return Err("not a safe regular .binds file".into());
+    }
+    let xml=fs::read_to_string(path).map_err(|e|e.to_string())?;
+    let at=xml.find("<Root ").ok_or("Root missing")?;
+    let end=at+xml[at..].find('>').ok_or("Root malformed")?+1;
+    let root=&xml[at..end];
+    if !attr(root,"PresetName").map(|name|name.eq_ignore_ascii_case(preset)).unwrap_or(false)
+      || attr(root,"MajorVersion").as_deref()!=Some("4"){
+        return Err("PresetName does not match legacy filename".into());
+    }
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
