@@ -1,7 +1,7 @@
 /** EDCH v1.6.6 — Elite-style controls workbench with explicit review-before-save.
  * No live game input, local ML, network data, hidden profile changes or fabricated device buttons.
  */
-import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset } from "../../features/controls/binds.js";
+import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset, groupOf } from "../../features/controls/binds.js";
 import { localizedActionLabel} from "../../features/controls/actionLabels.js";
 import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
 import {
@@ -21,6 +21,7 @@ import { virtualFootMouse } from "./virtualFootMouse.js";
 import {ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
 import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, type InGameOnFootStatus } from "../../features/controls/inGameOnFoot.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
+import { captureKeyboardForFoot, captureMouseForFoot, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
@@ -51,6 +52,8 @@ export class ControlsPresetEditor {
   private inspectedKey="";
   private inspectedXbox="";
   private inspectedMouse="";
+  private captureMode=false;
+  private captureStatus="";
   private lastCreated?:{preset:string;filename:string;path:string};
   private inGameStatus:InGameOnFootStatus|null=null;
   private inGameGuideMessage="";
@@ -73,14 +76,14 @@ export class ControlsPresetEditor {
     this.context={meta,files,active,reload};
     if(this.mode!==scope){
       this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;
-      this.editAction="";this.message="";this.section="all";
+      this.editAction="";this.message="";this.section="all";this.captureMode=false;
       this.selected=active;this.source=undefined;this.attempted="";this.editInput="";this.inGameStatus=null;
     }
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
       .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
       this.selected=names.includes(active)?active:names[0]??"";
-      this.source=undefined;this.attempted="";this.staged=[];this.editAction="";this.inGameStatus=null;
+      this.source=undefined;this.attempted="";this.staged=[];this.editAction="";this.inGameStatus=null;this.captureMode=false;
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
     const src=this.source?.filename===this.selected?this.source:undefined;
@@ -112,10 +115,10 @@ export class ControlsPresetEditor {
     const btn=(text:string,fn:()=>void,disabled=false,style="")=>h(`button.edch-c166-btn${style?"."+style:""}`,{type:"button",disabled,onclick:fn},text);
     const sourceSelect=h("label.edch-c166-source",null,"Profil Elite Dangerous",h("select",{value:this.selected,disabled:this.loading||this.saving,
       onchange:(e:Event)=>{this.generation++;this.selected=(e.target as HTMLSelectElement).value;this.source=undefined;
-        this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.repaint();},
+        this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.captureMode=false;this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · Energy Link v1.6.17"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · capture P/S v1.6.19"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -124,7 +127,7 @@ export class ControlsPresetEditor {
         onclick:()=>{
           if(this.family===x.id)return;
           if(this.staged.length&&!window.confirm("Changer de périphérique et abandonner le brouillon non enregistré ?"))return;
-          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";
+          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";this.captureMode=false;
           this.repaint();
         }},x.id==="azerty"&&this.mode==="foot"?"Clavier AZERTY + souris":x.label)));
     const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
@@ -135,7 +138,10 @@ export class ControlsPresetEditor {
       h("thead",null,h("tr",null,...["Commande","Principale","Secondaire","Attribuer"].map(s=>h("th",null,s)))),
       h("tbody",null,...rows.slice(0,200).map(row=>{
         const button=(slot:"primary"|"secondary")=>btn(slot==="primary"?"P":"S",()=>{
-          this.editAction=row.action;this.editSlot=slot;this.replace=false;this.message="";this.repaint();
+          this.editAction=row.action;this.editSlot=slot;this.replace=false;this.message="";
+           this.captureMode=Boolean(src)&&this.mode==="foot"&&this.family==="azerty";
+           this.captureStatus="";
+           this.repaint(this.captureMode?"capture":undefined);
         },false, this.editAction===row.action&&this.editSlot===slot?"selected":"");
         const value=(b?:Bind)=>h("span",{class:b?"edch-c166-bound":"edch-c166-unbound"},b?readKey(b):"— Libre —");
         return h("tr",{class:this.editAction===row.action?"edch-c166-current":""},
@@ -174,6 +180,10 @@ export class ControlsPresetEditor {
         old?h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.replace,onchange:(e:Event)=>{
           this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
         btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
+        this.mode==="foot"&&this.family==="azerty"
+          ?btn("Appuyer sur une touche (clavier / souris)",()=>{
+            this.captureMode=true;this.captureStatus="";this.repaint("capture");
+          },!src||this.loading||this.saving):null,
       ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
     const inGameCard=this.mode==="foot"
       ?h("section.edch-ingame-foot",{role:"region","aria-label":"Configurer les commandes à pied dans Elite Dangerous Odyssey"},
@@ -406,6 +416,47 @@ export class ControlsPresetEditor {
         this.repaint("mouse");
       },
     }) : null;
+    const captureOverlay=this.captureMode&&this.mode==="foot"&&this.family==="azerty"&&src
+      ?h("div.edch-c166-capture-overlay",{
+        role:"dialog","aria-modal":"true",tabIndex:0,
+        "aria-label":"Appuyer sur une touche pour attribuer la commande",
+        onkeydown:(e:KeyboardEvent)=>{
+          e.preventDefault();e.stopPropagation();
+          if(e.key==="Escape"){
+            this.captureMode=false;this.captureStatus="";
+            this.message="Capture annulée. Aucune touche modifiée.";this.repaint();return;
+          }
+          const input=captureKeyboardForFoot(e);
+          if(!input){
+            this.captureStatus="Touche ou combinaison non prise en charge : appuie sur une touche seule (sans Ctrl, Alt ou Maj).";
+            this.repaint("capture");return;
+          }
+          this.applyCapturedInput(input,meta);
+        },
+        onmousedown:(e:MouseEvent)=>{
+          e.preventDefault();e.stopPropagation();
+          const input=captureMouseForFoot(e.button);
+          if(!input){
+            this.captureStatus="Ce bouton de souris n'est pas reconnu.";
+            this.repaint("capture");return;
+          }
+          this.applyCapturedInput(input,meta);
+        },
+        oncontextmenu:(e:MouseEvent)=>{e.preventDefault();e.stopPropagation();},
+      },
+        h("div.edch-c166-capture-dialog",null,
+          h("h4",null,"Attribution directe · "+localizedActionLabel(meta,this.editAction)),
+          h("p",null,labelSlot(this.editSlot)+" : appuie maintenant sur la touche AZERTY ou sur le bouton de souris voulu."),
+          h("p.edch-c166-muted",null,
+            "Échap pour annuler. Touches seules uniquement. Les combinaisons Ctrl/Alt/Maj, les axes et les boutons HOTAS ne sont pas capturés ici."),
+          this.captureStatus?h("p.edch-c166-capture-error",{role:"status"},this.captureStatus):null,
+          h("button.edch-c166-capture-cancel",{
+            type:"button",onmousedown:(e:MouseEvent)=>e.stopPropagation(),
+            onclick:()=>{this.captureMode=false;this.captureStatus="";
+              this.message="Capture annulée.";this.repaint();},
+          },"Annuler (Échap)"),
+        ),
+      ):null;
     this.host=h("section.card.edch-controls-write-v166",null,heading,
       h("p.edch-c166-muted",{style:{padding:"0 16px"}},
         "Onglet : "+currentContext.label+" · Interface / cartes et diagnostics complémentaires dans les outils avancés."), 
@@ -419,15 +470,19 @@ export class ControlsPresetEditor {
       footMouse,
       xboxDiagram,
       h("div.edch-c166-layout",null,rowPane,right),
+      captureOverlay,
       modeProfiles,
       h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
     return this.host;
   }
 
-  private repaint(focus?:"search"|"keyboard"|"xbox"|"mouse") {
+  private repaint(focus?:"search"|"keyboard"|"xbox"|"mouse"|"capture") {
     const c=this.context;
     if (!this.host?.isConnected||!c)return;
     this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));
+    if(focus==="capture"){
+      this.host.querySelector<HTMLElement>(".edch-c166-capture-overlay")?.focus({preventScroll:true});
+    }
     if(focus==="keyboard"&&this.inspectedKey){
       const next=this.host.querySelector<HTMLButtonElement>('button.edch-vkb-key[data-key="'+this.inspectedKey+'"]');
       next?.focus({preventScroll:true});
@@ -452,6 +507,54 @@ export class ControlsPresetEditor {
       this.message="";
     } catch(e){if(gen===this.generation)this.message=`Lecture impossible : ${String(e)}`;}
     finally{if(gen===this.generation){this.loading=false;this.repaint();}}
+  }
+  /** P/S on Odyssey: a captured key becomes a pending change, never a live game edit.
+   * Warn about occupied slots and hard-stop on a collision in the On Foot context.
+   */
+  private applyCapturedInput(input:CapturedDigitalInput,meta:BindsMeta) {
+    const src=this.source,action=this.editAction,slot=this.editSlot;
+    if(!src||this.mode!=="foot"||this.family!=="azerty"||!src.actions.includes(action)){
+      this.captureMode=false;this.message="Sélection invalide : choisis à nouveau une commande À pied.";this.repaint();return;
+    }
+    const old=src.binds.find(b=>b.action===action&&b.slot===slot);
+    if(old&&old.device===input.device&&old.key===input.key&&!old.modifiers.length){
+      this.captureMode=false;this.message="Cette touche est déjà attribuée à cette commande.";this.repaint();return;
+    }
+    const next:PresetAssignment={action,slot,device:input.device,key:input.key,modifiers:[],
+      replaceExisting:Boolean(old)};
+    if(!isStagedAssignmentValid(next,src.actions,src.binds)){
+      this.captureStatus=input.device==="Mouse"
+        ?input.label+" : bouton non enregistré dans le profil .binds. Attribue-le d'abord dans Odyssey puis actualise EDCH."
+        :"Touche non compatible avec les profils Odyssey gérés par EDCH.";
+      this.repaint("capture");return;
+    }
+    const sameContext=(otherAction:string)=>groupOf(meta,otherAction)===groupOf(meta,action);
+    const sameInput=(d:Pick<Bind,"device"|"key"|"modifiers">)=>
+      d.device===input.device&&d.key===input.key&&d.modifiers.length===0;
+    const originalCollision=src.binds.find(b=>b.slot!=="axis"&&sameContext(b.action)&&sameInput(b)&&
+      !(b.action===action&&b.slot===slot) &&
+      !this.staged.some(c=>c.action===b.action&&c.slot===b.slot&&c.replaceExisting));
+    const stagedCollision=this.staged.find(c=>sameContext(c.action)&&sameInput(c)&&
+      !(c.action===action&&c.slot===slot));
+    const collision=originalCollision?.action??stagedCollision?.action;
+    if(collision){
+      this.captureStatus="Touche "+input.label+" déjà utilisée à pied pour « "+
+        localizedActionLabel(meta,collision)+" ». Choisis une autre touche.";
+      this.repaint("capture");return;
+    }
+    if(old&&!window.confirm("Remplacer "+readKey(old)+" par "+input.device+" : "+input.key+
+        " pour « "+localizedActionLabel(meta,action)+" » ?\\n"+
+        "Le remplacement concerne UNIQUEMENT le nouveau profil à créer ; le fichier actuel reste intact.")){
+      this.captureStatus="Remplacement non confirmé. Choisis une autre touche ou appuie sur Échap.";
+      this.repaint("capture");return;
+    }
+    this.staged=this.staged.filter(c=>c.action!==action||c.slot!==slot).concat(next);
+    this.acknowledgeWarnings=false;
+    this.replace=Boolean(old);
+    this.captureMode=false;this.captureStatus="";
+    this.message="Touche détectée : "+input.label+" → "+localizedActionLabel(meta,action)+
+      " ("+labelSlot(slot)+"). Ajoutée au brouillon : crée ensuite un nouveau profil pour le jeu.";
+    this.repaint();
   }
   private stageSingle(meta:BindsMeta){
     const source=this.source;
