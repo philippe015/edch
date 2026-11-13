@@ -21,3 +21,39 @@
 .edch-c166-capture-cancel:focus-visible{outline:2px solid #ffcf9d;outline-offset:3px}
 @media(max-width:650px){.edch-c166-capture-overlay{padding:10px}
   .edch-c166-capture-dialog{padding:19px 13px}}
+
+/* v1.6.20: the AZERTY keyboard is part of the capture dialog, not hidden behind it. */
+.edch-c166-capture-overlay{padding:12px;overflow:hidden;cursor:default}
+.edch-c166-capture-dialog{
+  width:min(96vw,1450px);max-height:calc(100dvh - 24px);
+  overflow-y:auto;overscroll-behavior:contain;
+  padding:16px 18px;text-align:left;
+}
+.edch-c166-capture-dialog>h4,.edch-c166-capture-dialog>p:first-of-type{
+  text-align:center;
+}
+.edch-c166-capture-keyboard{min-width:0;max-width:100%;margin:10px 0 13px}
+.edch-c166-capture-keyboard .edch-vkb-panel{margin:0;padding:12px}
+.edch-c166-capture-keyboard .edch-vkb-scroll{max-width:100%;overflow-x:auto}
+.edch-c166-capture-keyboard .edch-vkb-key:disabled{
+  opacity:.35;cursor:not-allowed!important;filter:grayscale(1);
+}
+.edch-c166-capture-keyboard .edch-vkb-key:not(:disabled){
+  cursor:pointer!important;
+}
+.edch-c166-capture-mouse-zone{
+  border:2px dashed #73a6b8;border-radius:8px;padding:10px;
+  background:#213a49;display:flex;align-items:center;
+  justify-content:center;gap:12px;flex-wrap:wrap;
+  font-size:.83rem;cursor:crosshair;
+}
+.edch-c166-capture-mouse-zone small{color:#c4d6e1}
+.edch-c166-capture-mouse-zone:focus-visible{outline:3px solid #ffcb92;outline-offset:2px}
+.edch-c166-capture-dialog>.edch-c166-muted{margin:10px 0}
+.edch-c166-capture-cancel{display:block;margin:10px auto 0}
+@media(max-width:650px){
+  .edch-c166-capture-overlay{padding:5px}
+  .edch-c166-capture-dialog{max-height:calc(100dvh - 10px);padding:10px}
+  .edch-c166-capture-keyboard .edch-vkb-panel{padding:7px}
+  .edch-c166-capture-dialog>h4{font-size:1rem}
+}
