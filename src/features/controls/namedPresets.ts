@@ -13,7 +13,8 @@ export function safeEdchPresetName(name:string):boolean {
 }
 export function matchedPresetFiles(name:string,files:readonly string[]):string[] {
   if(!safeEdchPresetName(name))return [];
-  return files.filter(f=>new RegExp(`^${name.replace(/[.*+?^${ }()|[\]\\]/g,"\\$&")}\\.4\\.\\d+\\.binds$`,"i").test(f));
+  return files.filter(f=>f.toUpperCase().startsWith(name+".4.")&&
+    /^EDCH_[A-Z0-9_]+[.]4[.][0-9]+[.]binds$/i.test(f));
 }
 export function presetNameHint(scope:GameScope,family:InputFamily,usage:Usage):string {
   return namedPreset(scope,family,usage).replace(/_/g," · ");
