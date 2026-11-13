@@ -1,0 +1,61 @@
+name: EDCH Cyberpunk Philou - AZERTY visible during capture v1.6.20
+
+on:
+  push:
+    branches:
+      - 'feat/clavier-azerty-visible-capture-v1.6.20-*'
+  pull_request:
+    paths:
+      - 'src/features/controls/footDirectCapture.ts'
+      - 'src/views/controls/virtualAzertyKeyboard.ts'
+      - 'src/views/controls/presetEditor.ts'
+      - 'public/foot-direct-capture-v1619.css'
+      - 'test/azerty-visible-capture-v1620.test.mjs'
+      - '.github/workflows/edch-azerty-modal-v1620.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edch-azerty-modal-v1620-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - name: TypeScript compile
+        run: npm run build
+      - name: All JavaScript regressions
+        run: node --test test/*.test.mjs
+  native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux dependencies for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libgtk-3-dev libsoup-3.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build Tauri frontend
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Native binding tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Native compilation
+        run: cargo check --manifest-path src-tauri/Cargo.toml

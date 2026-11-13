@@ -21,7 +21,7 @@ import { virtualFootMouse } from "./virtualFootMouse.js";
 import {ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
 import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, type InGameOnFootStatus } from "../../features/controls/inGameOnFoot.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
-import { captureKeyboardForFoot, captureMouseForFoot, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
+import { captureKeyboardForFoot, captureMouseForFoot, captureVirtualFootKey, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
@@ -118,7 +118,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.captureMode=false;this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · capture P/S v1.6.19"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · clavier visible pendant la capture v1.6.20"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -416,42 +416,69 @@ export class ControlsPresetEditor {
         this.repaint("mouse");
       },
     }) : null;
+    // Keep the AZERTY keyboard visible *inside* the modal: the page behind is dimmed.
+    // Mouse capture is isolated in a dedicated target so virtual keyboard clicks
+    // cannot accidentally become a Mouse_1 assignment.
+    const captureKeyboard=this.captureMode&&src?virtualAzertyKeyboard({
+      meta,scope:"foot",original:src.binds,draft:this.staged,
+      selectedKey:"",sourceLoaded:true,captureMode:true,
+      onSelect:(key)=>{
+        const input=captureVirtualFootKey(key);
+        if(input)this.applyCapturedInput(input,meta);
+        else {this.captureStatus="Cette touche n'est pas disponible pour l'attribution directe.";this.repaint("capture");}
+      },
+    }):null;
     const captureOverlay=this.captureMode&&this.mode==="foot"&&this.family==="azerty"&&src
       ?h("div.edch-c166-capture-overlay",{
         role:"dialog","aria-modal":"true",tabIndex:0,
-        "aria-label":"Appuyer sur une touche pour attribuer la commande",
+        "aria-label":"Choisir une touche sur le clavier virtuel AZERTY",
         onkeydown:(e:KeyboardEvent)=>{
-          e.preventDefault();e.stopPropagation();
           if(e.key==="Escape"){
+            e.preventDefault();e.stopPropagation();
             this.captureMode=false;this.captureStatus="";
             this.message="Capture annulée. Aucune touche modifiée.";this.repaint();return;
           }
+          // Let focused on-screen buttons activate on Enter/Space.
+          const target=e.target as HTMLElement;
+          if(target.closest("button")&&(e.key==="Enter"||e.key===" ")){
+            e.stopPropagation();return;
+          }
+          e.preventDefault();e.stopPropagation();
           const input=captureKeyboardForFoot(e);
           if(!input){
-            this.captureStatus="Touche ou combinaison non prise en charge : appuie sur une touche seule (sans Ctrl, Alt ou Maj).";
+            this.captureStatus="Touche non prise en charge. Utilise une touche seule ou clique sur le clavier AZERTY affiché.";
             this.repaint("capture");return;
           }
           this.applyCapturedInput(input,meta);
         },
-        onmousedown:(e:MouseEvent)=>{
-          e.preventDefault();e.stopPropagation();
-          const input=captureMouseForFoot(e.button);
-          if(!input){
-            this.captureStatus="Ce bouton de souris n'est pas reconnu.";
-            this.repaint("capture");return;
-          }
-          this.applyCapturedInput(input,meta);
-        },
-        oncontextmenu:(e:MouseEvent)=>{e.preventDefault();e.stopPropagation();},
       },
         h("div.edch-c166-capture-dialog",null,
           h("h4",null,"Attribution directe · "+localizedActionLabel(meta,this.editAction)),
-          h("p",null,labelSlot(this.editSlot)+" : appuie maintenant sur la touche AZERTY ou sur le bouton de souris voulu."),
+          h("p",null,labelSlot(this.editSlot)+
+            " : clique sur une touche du clavier AZERTY affiché, ou utilise ton clavier physique."),
+          h("div.edch-c166-capture-keyboard",null,captureKeyboard),
+          h("div.edch-c166-capture-mouse-zone",{
+            tabIndex:0,role:"button",
+            "aria-label":"Zone pour attribuer un bouton de souris ; cliquer avec le bouton voulu",
+            onmousedown:(e:MouseEvent)=>{
+              e.preventDefault();e.stopPropagation();
+              const input=captureMouseForFoot(e.button);
+              if(!input){
+                this.captureStatus="Bouton de souris non pris en charge.";
+                this.repaint("capture");return;
+              }
+              this.applyCapturedInput(input,meta);
+            },
+            oncontextmenu:(e:MouseEvent)=>{e.preventDefault();e.stopPropagation();},
+          },
+            h("strong",null,"Souris : clique dans cette zone avec le bouton à attribuer"),
+            h("small",null,"Gauche, droit, molette ou bouton latéral reconnu dans le fichier .binds."),
+          ),
           h("p.edch-c166-muted",null,
-            "Échap pour annuler. Touches seules uniquement. Les combinaisons Ctrl/Alt/Maj, les axes et les boutons HOTAS ne sont pas capturés ici."),
+            "Échap pour annuler. Les combinaisons Ctrl/Alt/Maj, la ponctuation particulière et les axes ne sont pas capturés. Les touches indisponibles sont grisées."),
           this.captureStatus?h("p.edch-c166-capture-error",{role:"status"},this.captureStatus):null,
           h("button.edch-c166-capture-cancel",{
-            type:"button",onmousedown:(e:MouseEvent)=>e.stopPropagation(),
+            type:"button",
             onclick:()=>{this.captureMode=false;this.captureStatus="";
               this.message="Capture annulée.";this.repaint();},
           },"Annuler (Échap)"),

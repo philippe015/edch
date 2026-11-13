@@ -66,3 +66,11 @@ export function approvedCapturedKeyboardKey(device:string,key:string,modifiers:r
     "LeftShift","RightShift","LeftControl","RightControl","LeftAlt","RightAlt",
   ]).has(key.startsWith("Key_")?key.slice(4):"");
 }
+
+/** Clicking the on-screen AZERTY keyboard chooses a validated keyboard binding.
+ * It is not a browser key event and must never be mistaken for Mouse_1.
+ */
+export function captureVirtualFootKey(key:string):CapturedDigitalInput|null {
+  if(key==="Key_Escape"||!approvedCapturedKeyboardKey("Keyboard",key,[]))return null;
+  return {device:"Keyboard",key,label:key.replace(/^Key_/,"")};
+}
