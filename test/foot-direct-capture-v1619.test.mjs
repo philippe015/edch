@@ -36,8 +36,9 @@ test("captures recognized function, movement, editing and modifier keys",()=>{
     ["Tab","Tab","Key_Tab"],["ArrowLeft","ArrowLeft","Key_LeftArrow"],
     ["Enter","Enter","Key_Enter"],["Shift","ShiftLeft","Key_LeftShift"],
     ["Backspace","Backspace","Key_Backspace"],["5","Numpad5","Key_Numpad_5"],
+    ["Control","ControlLeft","Key_LeftControl"],["Alt","AltLeft","Key_LeftAlt"],
   ]){
-    const value=captureKeyboardForFoot(key(raw,code,{shiftKey:raw==="Shift"}));
+    const value=captureKeyboardForFoot(key(raw,code,{shiftKey:raw==="Shift",ctrlKey:raw==="Control",altKey:raw==="Alt"}));
     assert.equal(value?.key,expected,code);
     assert.equal(approvedCapturedKeyboardKey("Keyboard",expected,[]),true,expected);
   }
