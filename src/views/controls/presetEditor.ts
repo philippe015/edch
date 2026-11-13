@@ -1,9 +1,9 @@
 /** EDCH v1.6.6 — Elite-style controls workbench with explicit review-before-save.
  * No live game input, local ML, network data, hidden profile changes or fabricated device buttons.
  */
-import { type BindsMeta, type Bind, parseBinds, parseXml } from "../../features/controls/binds.js";
+import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset } from "../../features/controls/binds.js";
 import { localizedActionLabel} from "../../features/controls/actionLabels.js";
-import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, type OptionFile } from "../../platform/bridge.js";
+import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
   type PresetAssignment, type SuggestedProfile,
@@ -19,11 +19,12 @@ import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
 import { virtualFootMouse } from "./virtualFootMouse.js";
 import {ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
+import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, type InGameOnFootStatus } from "../../features/controls/inGameOnFoot.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
-interface SourceState { filename: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
+interface SourceState { filename: string; preset: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
 // Trois contextes principaux : l'interface et les cartes sont dans les outils avancés.
 export function actionsFromXml(xml: string): string[] {
@@ -50,6 +51,10 @@ export class ControlsPresetEditor {
   private inspectedKey="";
   private inspectedXbox="";
   private inspectedMouse="";
+  private lastCreated?:{preset:string;filename:string;path:string};
+  private inGameStatus:InGameOnFootStatus|null=null;
+  private inGameGuideMessage="";
+  private inGameGuideBusy=false;
   private profile:SuggestedProfile="balanced";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
@@ -69,13 +74,13 @@ export class ControlsPresetEditor {
     if(this.mode!==scope){
       this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;
       this.editAction="";this.message="";this.section="all";
-      this.selected=active;this.source=undefined;this.attempted="";this.editInput="";
+      this.selected=active;this.source=undefined;this.attempted="";this.editInput="";this.inGameStatus=null;
     }
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
       .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
       this.selected=names.includes(active)?active:names[0]??"";
-      this.source=undefined;this.attempted="";this.staged=[];this.editAction="";
+      this.source=undefined;this.attempted="";this.staged=[];this.editAction="";this.inGameStatus=null;
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
     const src=this.source?.filename===this.selected?this.source:undefined;
@@ -107,7 +112,7 @@ export class ControlsPresetEditor {
     const btn=(text:string,fn:()=>void,disabled=false,style="")=>h(`button.edch-c166-btn${style?"."+style:""}`,{type:"button",disabled,onclick:fn},text);
     const sourceSelect=h("label.edch-c166-source",null,"Profil Elite Dangerous",h("select",{value:this.selected,disabled:this.loading||this.saving,
       onchange:(e:Event)=>{this.generation++;this.selected=(e.target as HTMLSelectElement).value;this.source=undefined;
-        this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
+        this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
       h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · Energy Link v1.6.17"),
@@ -170,6 +175,40 @@ export class ControlsPresetEditor {
           this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
         btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
       ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
+    const inGameCard=this.mode==="foot"
+      ?h("section.edch-ingame-foot",{role:"region","aria-label":"Configurer les commandes à pied dans Elite Dangerous Odyssey"},
+        h("div.edch-ingame-foot-header",null,
+          h("h4",null,"Configurer les commandes à pied directement dans le jeu"),
+          h("p.edch-c166-muted",null,
+            "EDCH prépare un nouveau fichier .binds compatible Odyssey. Le choix des touches dans le jeu reste sous ton contrôle."),
+        ),
+        h("div.edch-ingame-foot-summary",null,
+          h("strong",null,"Profil à activer : "+(this.lastCreated?.preset??src?.preset??"non chargé")),
+          this.lastCreated?h("p.edch-c166-muted",null,
+            "Dernier profil créé : "+this.lastCreated.filename):null,
+          h("p.edch-c166-muted",null,
+            this.inGameStatus?this.inGameStatus.help:
+              "Le préréglage actif À pied n'a pas encore été vérifié. Le nouveau profil ne devient actif qu'après sélection dans le jeu."),
+          this.inGameStatus?.activePreset
+            ?h("p.edch-c166-muted",null,"Préréglage À pied détecté : "+this.inGameStatus.activePreset):null,
+        ),
+        h("ol.edch-ingame-foot-steps",null,
+          ...ON_FOOT_IN_GAME_STEPS.map((step,i)=>h("li",null,
+            h("span.edch-ingame-foot-step",null,String(i+1)),
+            h("span",null,step))),
+        ),
+        h("div.edch-ingame-foot-buttons",null,
+          btn("Ouvrir le dossier des profils .binds",()=>{void this.openBindingsFolder();},
+            !isTauri()||isRemote()||this.inGameGuideBusy),
+          btn("Vérifier le profil À pied actif",()=>{void this.verifyInGamePreset();},
+            !isTauri()||isRemote()||this.inGameGuideBusy),
+          btn("Relire les réglages faits dans le jeu",()=>{void this.refreshAfterGameChanges();},
+            !isTauri()||isRemote()||this.inGameGuideBusy||this.loading),
+        ),
+        this.inGameGuideMessage?h("p.edch-ingame-foot-message",{role:"status"},this.inGameGuideMessage):null,
+        h("p.edch-c166-muted",null,
+          "Aucune modification de StartPreset, aucune saisie simulée dans le jeu. Le menu À pied peut utiliser un préréglage différent de Vaisseau et SRV."),
+      ):null;
     // Ready-made profiles: keyboard templates use curated printed AZERTY keys.
     // HOTAS/Xbox recommendations only reuse buttons observed in the source .binds.
     const energyLinkCard=this.mode==="foot"
@@ -374,6 +413,7 @@ export class ControlsPresetEditor {
         ? h("p.edch-c166-warning",null,"Le jeu indique le clavier "+src.keyboardLayout+". Vérifie AZERTY avant de valider.") : null,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       energyLinkCard,
+      inGameCard,
       quickCards,
       azertyKeyboard,
       footMouse,
@@ -408,7 +448,7 @@ export class ControlsPresetEditor {
       const xml=await readOptionFile("Bindings",name);
       if(gen!==this.generation||name!==this.selected)return;
       const parsed=parseBinds(xml);
-      this.source={filename:name,binds:parsed.binds,actions:actionsFromXml(xml),keyboardLayout:parsed.keyboardLayout};
+      this.source={filename:name,preset:parsed.preset,binds:parsed.binds,actions:actionsFromXml(xml),keyboardLayout:parsed.keyboardLayout};
       this.message="";
     } catch(e){if(gen===this.generation)this.message=`Lecture impossible : ${String(e)}`;}
     finally{if(gen===this.generation){this.loading=false;this.repaint();}}
@@ -429,6 +469,59 @@ export class ControlsPresetEditor {
     this.staged=advice.changes.map(c=>({...c,modifiers:c.modifiers.map(m=>({...m}))}));
     this.acknowledgeWarnings=false;this.message=`${this.staged.length} suggestion(s) prêtes. Vérifie chaque touche avant de créer un profil.`;this.repaint();
   }
+  /** Reveals the actual bindings file's directory in Manjaro/Windows.
+   * Never assumes a particular Steam/Proton prefix.
+   */
+  private async openBindingsFolder(){
+    if(!isTauri()||isRemote()||this.inGameGuideBusy)return;
+    this.inGameGuideBusy=true;
+    try{
+      const root=await optionsDir();
+      const filename=this.lastCreated?.filename??this.selected;
+      if(!/^[A-Za-z0-9_.-]+\\.binds$/.test(filename))throw new Error("Aucun profil .binds à afficher.");
+      const path=this.lastCreated?.path??root.replace(/[\\\\/]+$/,"")+"/Bindings/"+filename;
+      await revealPath(path);
+      this.inGameGuideMessage="Le gestionnaire de fichiers affiche le dossier des profils Odyssey.";
+    }catch(e){this.inGameGuideMessage="Ouverture du dossier impossible : "+String(e);}
+    finally{this.inGameGuideBusy=false;this.repaint();}
+  }
+  private async verifyInGamePreset(){
+    if(!isTauri()||isRemote()||this.inGameGuideBusy)return;
+    this.inGameGuideBusy=true;
+    try{
+      const files=await listOptionFiles();
+      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset(?:\\.4)?\\.start$/i.test(f.name))
+        .sort((a,b)=>Number(b.name.toLowerCase()==="startpreset.4.start")-Number(a.name.toLowerCase()==="startpreset.4.start"))[0];
+      const text=start?await readOptionFile("Bindings",start.name):null;
+      this.inGameStatus=inGameOnFootStatus(text,this.lastCreated?.preset??this.source?.preset??null);
+      this.inGameGuideMessage="Vérification de StartPreset effectuée en lecture seule.";
+    }catch(e){this.inGameStatus=inGameOnFootStatus(null,this.lastCreated?.preset??this.source?.preset??null);
+      this.inGameGuideMessage="Lecture du préréglage actif impossible : "+String(e);}
+    finally{this.inGameGuideBusy=false;this.repaint();}
+  }
+  private async refreshAfterGameChanges(){
+    if(!isTauri()||isRemote()||this.inGameGuideBusy)return;
+    if(this.staged.length&&!window.confirm("Actualiser depuis le jeu et abandonner le brouillon non enregistré ?"))return;
+    const ctx=this.context;if(!ctx)return;
+    this.inGameGuideBusy=true;
+    try{
+      const files=await listOptionFiles();
+      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset(?:\\.4)?\\.start$/i.test(f.name))
+        .sort((a,b)=>Number(b.name.toLowerCase()==="startpreset.4.start")-Number(a.name.toLowerCase()==="startpreset.4.start"))[0];
+      const text=start?await readOptionFile("Bindings",start.name):null;
+      const current=text?onFootPresetFromStartFile(text):null;
+      const activeFile=current?fileForPreset(current,files.filter(f=>f.folder==="Bindings").map(f=>f.name)):undefined;
+      if(activeFile)this.selected=activeFile;
+      this.source=undefined;this.attempted="";this.staged=[];this.acknowledgeWarnings=false;
+      this.generation++;
+      this.inGameStatus=inGameOnFootStatus(text,current);
+      this.inGameGuideMessage=activeFile
+        ?"Relecture du profil « "+current+" » demandé. Les affectations modifiées dans Odyssey sont rechargées."
+        :"Profils relus. Si le jeu a changé de préréglage, sélectionne manuellement son fichier .binds.";
+      await ctx.reload();
+    }catch(e){this.inGameGuideMessage="Relecture des commandes impossible : "+String(e);}
+    finally{this.inGameGuideBusy=false;this.repaint();}
+  }
   private async save(){
     const ctx=this.context,source=this.source;
     if(!ctx||!source||source.filename!==this.selected||!this.staged.length||this.saving||this.loading)return;
@@ -441,7 +534,11 @@ export class ControlsPresetEditor {
     try{
       const out=await controlsSavePresetBatch(source.filename,this.staged);
       this.staged=[];this.acknowledgeWarnings=false;
-      this.message=`Profil ${out.preset} créé : ${out.path}. Choisis ce préréglage dans Options → Commandes du jeu après son redémarrage.`;
+      this.lastCreated={preset:out.preset,filename:out.filename,path:out.path};
+      this.selected=out.filename;this.source=undefined;this.attempted="";
+      this.inGameStatus=null;
+      this.inGameGuideMessage="Profil prêt : démarre Odyssey, ouvre Options → Commandes → À pied et sélectionne « "+out.preset+" ».";
+      this.message="Profil "+out.preset+" créé sans écraser le fichier source. Sélectionne-le et applique-le dans les commandes À pied du jeu.";
       await ctx.reload();
     }catch(e){this.message=`Création du profil refusée : ${String(e)}`;}
     finally{this.saving=false;this.repaint();}
