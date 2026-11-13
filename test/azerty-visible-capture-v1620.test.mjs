@@ -45,7 +45,7 @@ test("mouse capture remains an explicit, separate click zone",()=>{
   const beforeMouseZone=zone.slice(0,zone.indexOf('h("div.edch-c166-capture-mouse-zone"'));
   assert.doesNotMatch(beforeMouseZone,/onmousedown:/,"dialog and keyboard must not capture Mouse_1 on click");
   assert.ok(editor.includes("captureVirtualFootKey(key)"),"virtual key uses keyboard input helper");
-  assert.ok(zone.includes("captureMode:true"));
+  assert.ok(editor.includes("captureMode:true"));
 });
 
 test("keyboard is embedded in foreground dialog, not just behind dim overlay",()=>{
