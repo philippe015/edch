@@ -16,6 +16,7 @@ import {
 import { GAME_SECTIONS, PREPARED_TEMPLATES, prepareAzerty, sectionForAction } from "../../features/controls/preparedProfiles.js";
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
+import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
 
 interface SourceState { filename: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
@@ -41,6 +42,7 @@ export class ControlsPresetEditor {
   private family:InputFamily="azerty";
   private query="";
   private section="all";
+  private inspectedKey="";
   private profile:SuggestedProfile="balanced";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
@@ -249,6 +251,14 @@ export class ControlsPresetEditor {
       this.family==="hotas" ? h("p.edch-c166-muted",null,
         "HOTAS : profils X52 Pro/X56 selon les affectations observées. Les numéros Linux ne sont pas des boutons Elite vérifiés.") : null,
       editBox,adviceBox,draftBox);
+    const azertyKeyboard=this.family==="azerty" ? virtualAzertyKeyboard({
+      meta,scope:this.mode,original:src?.binds??[],draft:this.staged,
+      selectedKey:this.inspectedKey,sourceLoaded:Boolean(src),
+      onSelect:(key)=>{
+        this.inspectedKey=key;
+        this.repaint("keyboard");
+      },
+    }) : null;
     this.host=h("section.card.edch-controls-write-v166",null,heading,
       h("p.edch-c166-muted",{style:{padding:"0 16px"}},
         "Onglet : "+currentContext.label+" · Interface / cartes et diagnostics complémentaires dans les outils avancés."), 
@@ -256,17 +266,22 @@ export class ControlsPresetEditor {
         ? h("p.edch-c166-warning",null,"Le jeu indique le clavier "+src.keyboardLayout+". Vérifie AZERTY avant de valider.") : null,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       quickCards,
+      azertyKeyboard,
       h("div.edch-c166-layout",null,rowPane,right),
       modeProfiles,
       h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
     return this.host;
   }
 
-  private repaint(focus?:"search") {
+  private repaint(focus?:"search"|"keyboard") {
     const c=this.context;
     if (!this.host?.isConnected||!c)return;
     this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));
-    if(focus){const input=this.host.querySelector<HTMLInputElement>(".edch-c166-search input");if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}}
+    if(focus==="keyboard"&&this.inspectedKey){
+      const next=this.host.querySelector<HTMLButtonElement>('button.edch-vkb-key[data-key="'+this.inspectedKey+'"]');
+      next?.focus({preventScroll:true});
+    }
+    if(focus==="search"){const input=this.host.querySelector<HTMLInputElement>(".edch-c166-search input");if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}}
   }
   private async loadSource(name:string) {
     const gen=++this.generation;this.attempted=name;this.loading=true;this.repaint();
