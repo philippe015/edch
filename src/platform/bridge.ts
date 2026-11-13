@@ -342,6 +342,12 @@ export const controlsSavePreset = (sourceFile: string, change: ControlsPresetCha
 /** v1.6.6: checked multi-change generation, never modifying the original file. */
 export const controlsSavePresetBatch = (sourceFile: string, changes: ControlsPresetChange[]): Promise<ControlsPresetResult> =>
   invoke<ControlsPresetResult>("controls_save_preset_batch", { sourceFile, changes });
+/** v1.6.21: stable user-readable name, explicit overwrite only with automatic backup. */
+export const controlsSaveNamedPresetBatch = (
+  sourceFile:string, changes:ControlsPresetChange[], presetName:string,
+  updateExisting:boolean, frenchAzerty:boolean,
+):Promise<ControlsPresetResult> => invoke<ControlsPresetResult>("controls_save_named_preset_batch",
+  {sourceFile,changes,presetName,updateExisting,frenchAzerty});
 /** v1.6.7: optional Linux joystick inspection. Raw indexes are NOT game .binds IDs. */
 export interface HotasDevice { id: string; name: string; vendor?: string | null; product?: string | null; readable: boolean; }
 export interface HotasEvent { deviceId: string; kind: "button" | "axis"; inputIndex: number; value: number; }
