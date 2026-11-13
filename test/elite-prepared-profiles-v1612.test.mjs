@@ -129,7 +129,7 @@ test("native and web prepared keyboard allowlists match exactly",()=>{
 test("Elite-style UI shows categories and ready-made profiles but retains original confirmations",()=>{
   const view=read("src/views/controls/presetEditor.ts");
   const html=read("public/index.html");
-  for(const needle of ["quickCards","Préparer · ","sectionTabs","GAME_SECTIONS","prepareAzerty","stageAdvice","Brouillon à valider","window.confirm(","controlsSavePresetBatch"])
+  for(const needle of ["quickCards","Préparer · ","sectionTabs","GAME_SECTIONS","prepareAzerty","stageAdvice","Brouillon à valider","window.confirm(","controlsSaveNamedPresetBatch"])
     assert.ok(view.includes(needle),needle);
   assert.ok(html.includes("elite-prepared-profiles.css"));
 });
