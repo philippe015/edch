@@ -1,0 +1,62 @@
+name: EDCH Cyberpunk Philou - Odyssey named complete presets v1.6.21
+
+on:
+  push:
+    branches:
+      - 'feat/profils-nommes-commandes-sol-completes-v1.6.21-*'
+  pull_request:
+    paths:
+      - 'src/features/controls/footCompleteProfiles.ts'
+      - 'src/views/controls/presetEditor.ts'
+      - 'src/platform/bridge.ts'
+      - 'src-tauri/src/controls_preset.rs'
+      - 'public/foot-complete-v1621.css'
+      - 'test/foot-complete-named-v1621.test.mjs'
+      - '.github/workflows/edch-foot-complete-v1621.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edch-foot-complete-v1621-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - name: TypeScript build
+        run: npm run build
+      - name: Complete JavaScript regressions
+        run: node --test test/*.test.mjs
+  native:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libgtk-3-dev libsoup-3.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compile frontend for Tauri
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Native profile output checks
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Native compilation
+        run: cargo check --manifest-path src-tauri/Cargo.toml
