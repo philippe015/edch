@@ -5,7 +5,7 @@
 export const PREPARED_AZERTY_KEYS:readonly string[] = Object.freeze([
   "Key_Z","Key_S","Key_Q","Key_D","Key_R","Key_F","Key_J","Key_L",
   "Key_H","Key_T","Key_M","Key_N","Key_V","Key_Y","Key_C","Key_U",
-  "Key_B","Key_E","Key_G","Key_X","Key_Space","Key_Tab",
+  "Key_B","Key_E","Key_G","Key_X","Key_3","Key_Space","Key_Tab",
   "Key_LeftShift","Key_LeftControl",
 ]);
 const APPROVED=new Set(PREPARED_AZERTY_KEYS);
