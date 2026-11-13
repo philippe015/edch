@@ -20,3 +20,7 @@
 .edch-c1621-unassigned summary{font-size:.8rem;color:#edc7a1}
 @media(max-width:650px){.edch-c1621-entry{grid-template-columns:1fr}
  .edch-c1621-name{min-width:0}}
+.edch-c1621-current-preview{display:grid;gap:3px;padding:4px 6px;
+ border-radius:5px;border:1px solid #b88047;background:#3b3028}
+.edch-c1621-current-preview strong{font-size:.78rem;color:#ffe0a7}
+.edch-c1621-current-preview small{font-size:.69rem;color:#c6d0d5}
