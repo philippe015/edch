@@ -28,8 +28,14 @@ Community data used to build public/data/game.json (tools/gen_data.py)
 
 Key bindings
 ------------
-- richardbuckle/EDRefCard (MIT) — control names and groups (bindingsData.py) and the
-  game's DeviceMappings.xml, vendored in tools/sources/edrefcard (tools/gen_binds.py).
+- EDRefCard (MIT, Copyright (c) 2017 Richard Buckle), via brammmers/edrefcard2
+  (maintained continuation of richardbuckle/EDRefCard, commit
+  f2e91f8072b8af066f17db6ece6058fc93694171) — device templates
+  (bindingsData.py), control names and groups (controlsData.py), and the
+  game's DeviceMappings.xml, vendored in tools/sources/edrefcard
+  (tools/gen_binds.py). Device illustrations are referenced from the
+  corresponding EDRefCard repository; no additional copies are bundled
+  by this sync.
 
 Live data
 ---------
