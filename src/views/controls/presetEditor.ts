@@ -422,7 +422,7 @@ export class ControlsPresetEditor {
         btn(this.saving?"Création du profil…":"Créer un nouveau profil pour Elite Dangerous",()=>{void this.save();},!canSave,"primary"),
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
-      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme le jeu et son lanceur, crée le profil, puis sélectionne son NOM EXACT dans Options → Commandes → À pied. Le profil source n’est jamais écrasé."));
+      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme le jeu et son lanceur, crée le profil, puis sélectionne son NOM EXACT dans Options → Commandes → À pied. Le profil source n’est jamais écrasé. Les catégories Général, Vaisseau et VRS restent inchangées."));
     const hotas = this.family==="hotas" && this.mode==="ship" ? this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
       const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
       if (!input) return;
