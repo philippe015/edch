@@ -23,7 +23,7 @@ import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, t
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { captureKeyboardForFoot, captureMouseForFoot, captureVirtualFootKey, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
-import {planCompleteFoot,missingFootMovement,suggestedPresetName} from "../../features/controls/footCompleteProfiles.js";
+import {planCompleteFoot,missingFootMovement,suggestedPresetName,mergeFootKeyboardMouse} from "../../features/controls/footCompleteProfiles.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
 interface SourceState { filename: string; preset: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
@@ -287,8 +287,9 @@ export class ControlsPresetEditor {
             ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
           const footMouse=src&&this.mode==="foot"&&this.family==="azerty"
             ?recommendFootMouse(src.actions,src.binds,meta):undefined;
-          const changes=[...(prepared?.changes??intelligent?.changes??inferred?.changes??[]),
-            ...(footMouse?.changes??[])];
+          const changes=this.mode==="foot"&&this.family==="azerty"
+            ?mergeFootKeyboardMouse(prepared?.changes??[],footMouse?.changes??[],src?.binds??[])
+            :[...(prepared?.changes??intelligent?.changes??inferred?.changes??[])];
           const covered=(prepared?.covered??intelligent?.covered??inferred?.covered??0)+(footMouse?.covered??0);
           const skipped=(prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0)
             +(footMouse?.skipped.length??0);
