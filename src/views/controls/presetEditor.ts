@@ -478,8 +478,8 @@ export class ControlsPresetEditor {
     try{
       const root=await optionsDir();
       const filename=this.lastCreated?.filename??this.selected;
-      if(!/^[A-Za-z0-9_.-]+\\.binds$/.test(filename))throw new Error("Aucun profil .binds à afficher.");
-      const path=this.lastCreated?.path??root.replace(/[\\\\/]+$/,"")+"/Bindings/"+filename;
+      if(!/^[A-Za-z0-9_.-]+[.]binds$/.test(filename))throw new Error("Aucun profil .binds à afficher.");
+      const path=this.lastCreated?.path??root+"/Bindings/"+filename;
       await revealPath(path);
       this.inGameGuideMessage="Le gestionnaire de fichiers affiche le dossier des profils Odyssey.";
     }catch(e){this.inGameGuideMessage="Ouverture du dossier impossible : "+String(e);}
@@ -490,7 +490,7 @@ export class ControlsPresetEditor {
     this.inGameGuideBusy=true;
     try{
       const files=await listOptionFiles();
-      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset(?:\\.4)?\\.start$/i.test(f.name))
+      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset([.]4)?[.]start$/i.test(f.name))
         .sort((a,b)=>Number(b.name.toLowerCase()==="startpreset.4.start")-Number(a.name.toLowerCase()==="startpreset.4.start"))[0];
       const text=start?await readOptionFile("Bindings",start.name):null;
       this.inGameStatus=inGameOnFootStatus(text,this.lastCreated?.preset??this.source?.preset??null);
@@ -506,7 +506,7 @@ export class ControlsPresetEditor {
     this.inGameGuideBusy=true;
     try{
       const files=await listOptionFiles();
-      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset(?:\\.4)?\\.start$/i.test(f.name))
+      const start=files.filter(f=>f.folder==="Bindings"&&/^StartPreset([.]4)?[.]start$/i.test(f.name))
         .sort((a,b)=>Number(b.name.toLowerCase()==="startpreset.4.start")-Number(a.name.toLowerCase()==="startpreset.4.start"))[0];
       const text=start?await readOptionFile("Bindings",start.name):null;
       const current=text?onFootPresetFromStartFile(text):null;
@@ -514,7 +514,7 @@ export class ControlsPresetEditor {
       if(activeFile)this.selected=activeFile;
       this.source=undefined;this.attempted="";this.staged=[];this.acknowledgeWarnings=false;
       this.generation++;
-      this.inGameStatus=inGameOnFootStatus(text,current);
+      this.inGameStatus=inGameOnFootStatus(text,this.lastCreated?.preset??current);
       this.inGameGuideMessage=activeFile
         ?"Relecture du profil « "+current+" » demandé. Les affectations modifiées dans Odyssey sont rechargées."
         :"Profils relus. Si le jeu a changé de préréglage, sélectionne manuellement son fichier .binds.";
