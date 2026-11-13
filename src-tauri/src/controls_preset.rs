@@ -266,6 +266,21 @@ fn preset_name_present(dir: &Path, name: &str) -> Result<bool,String> {
     Ok(false)
 }
 
+/// Allow an explicitly named copy with zero mutations when source keys are already good.
+fn rename_profile_root(xml:&str, name:&str) -> Result<String,String> {
+    if !token(name,40) || xml.len()>5_000_000 || xml.contains("<!DOCTYPE") ||
+       xml.contains("<!ENTITY") || !xml.contains("</Root>") {
+        return Err("invalid preset or unsafe XML".into());
+    }
+    let start=xml.find("<Root ").ok_or("Root missing")?;
+    let end=start+xml[start..].find('>').ok_or("Root invalid")?+1;
+    let root=&xml[start..end];
+    if attr(root,"MajorVersion").as_deref()!=Some("4") {
+        return Err("Odyssey v4 format required".into());
+    }
+    let next=set_attr(root,"PresetName",name)?;
+    Ok(xml.replacen(root,&next,1))
+}
 /// Generates a new EDCHProNNN profile with all confirmed changes, in one create_new write.
 #[tauri::command]
 pub async fn controls_save_preset_batch(
@@ -277,7 +292,9 @@ pub async fn controls_save_preset_batch(
         return Err("Close Elite Dangerous and launcher before generating a profile".into());
     }
     if !filename_valid(&source_file) { return Err("invalid source filename".into()); }
-    if changes.is_empty() || changes.len() > 64 { return Err("1–64 changes required".into()); }
+    if changes.len() > 64 || (changes.is_empty() && requested_preset_name.is_none()) {
+        return Err("0–64 changes allowed; zero requires a descriptive name".into());
+    }
     let base = Path::new(&crate::options::options_dir()?).join("Bindings");
     let path = base.join(&source_file);
     let meta = fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
@@ -299,7 +316,8 @@ pub async fn controls_save_preset_batch(
         Some(name)=>named_preset_candidate(name,1)?,
         None=>"EDCHPro001".to_string(),
     };
-    let validate = rewrite_xml_batch(&xml, &preflight_name, &changes)?;
+    let validate = if changes.is_empty() {rename_profile_root(&xml,&preflight_name)?}
+        else {rewrite_xml_batch(&xml,&preflight_name,&changes)?};
     if validate.len() > 5_000_000 { return Err("profile too large".into()); }
     for n in 1..=999 {
         let preset = match requested {
@@ -310,7 +328,9 @@ pub async fn controls_save_preset_batch(
         if preset_name_present(&base,&preset)? {continue;}
         let filename = format!("{preset}.{major}.{minor}.binds");
         let path = base.join(&filename);
-        let changed = if n == 1 { validate.clone() } else { rewrite_xml_batch(&xml, &preset, &changes)? };
+        let changed = if n == 1 { validate.clone() }
+            else if changes.is_empty() {rename_profile_root(&xml,&preset)?}
+            else {rewrite_xml_batch(&xml,&preset,&changes)?};
         let root_at=changed.find("<Root ").ok_or("generated Root missing")?;
         let root_end=root_at+changed[root_at..].find('>').ok_or("invalid generated Root")?+1;
         if attr(&changed[root_at..root_end],"PresetName").as_deref()!=Some(preset.as_str()) {
@@ -395,6 +415,30 @@ mod tests {
         assert!(rewrite_xml_batch(XML,"EDCHPro001",&[c(),c()]).is_err());
         assert!(rewrite_xml_batch(XML,"EDCHPro001",&[]).is_err());
         assert!(rewrite_xml_batch(XML,"EDCHPro001",&vec![c();65]).is_err());
+    }
+    #[test]
+    fn descriptive_name_matches_xml_and_uniqueness_suffix() {
+        let created=rename_profile_root(XML,"EDCH_PIED_AZERTY").unwrap();
+        assert!(created.contains("PresetName=\\"EDCH_PIED_AZERTY\\""));
+        assert_eq!(named_preset_candidate("EDCH_PIED_AZERTY",2).unwrap(),"EDCH_PIED_AZERTY_02");
+        assert!(named_preset_candidate("../unsafe",1).is_err());
+        assert!(named_preset_candidate("EDCH_é",1).is_err());
+        assert!(rename_profile_root(XML,"../unsafe").is_err());
+    }
+    #[test]
+    fn completed_output_is_checked_for_each_real_key() {
+        let changed=rewrite_xml_batch(XML,"EDCH_PIED_AZERTY",&[c()]).unwrap();
+        assert!(verify_profile_changes(&changed,&[c()]).is_ok());
+        let invalid=changed.replace("Key=\\"Joy_2\\" />","Key=\\"Joy_900\\" />");
+        assert!(verify_profile_changes(&invalid,&[c()]).is_err());
+    }
+    #[test]
+    fn reassign_a_key_then_reuse_its_old_value_in_same_batch() {
+        let first=ControlsChange{action:"YawLeftButton".into(),slot:"primary".into(),
+            device:"Keyboard".into(),key:"Key_Z".into(),modifiers:vec![],replace_existing:true};
+        let second=ControlsChange{action:"HyperSuperCombination".into(),slot:"secondary".into(),
+            device:"Keyboard".into(),key:"Key_A".into(),modifiers:vec![],replace_existing:false};
+        assert!(rewrite_xml_batch(XML,"EDCH_PIED_AZERTY",&[first,second]).is_ok());
     }
     #[test]
     fn batch_rejects_unsupported_input_and_occupied_primary() {
