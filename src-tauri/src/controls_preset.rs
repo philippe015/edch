@@ -436,6 +436,33 @@ mod tests {
 <FirePrimary><Primary Device="SaitekX52Pro" Key="Joy_2" /><Secondary Device="{NoDevice}" Key="" /></FirePrimary>
 </Root>"#;
     fn c() -> ControlsChange {ControlsChange{action:"YawLeftButton".into(),slot:"secondary".into(),device:"SaitekX52Pro".into(),key:"Joy_2".into(),modifiers:vec![],replace_existing:false}}
+    #[test]
+    fn stable_named_presets_reject_fake_or_unsafe_names() {
+        for preset in ["EDCH_PIED_AZERTY_POLY","EDCH_PIED_AZERTY_COMBAT","EDCH_SRV_XBOX_NAV"] {
+            assert!(safe_named_preset(preset), "expected safe name: {preset}");
+        }
+        for preset in ["EDCHPro001","Custom","EDCH_", "EDCH_path/evil",
+                       "EDCH_é", "EDCH_PIED COMBAT"] {
+            assert!(!safe_named_preset(preset));
+        }
+    }
+    #[test]
+    fn named_output_contains_expected_keys_and_french_layout() {
+        let source=XML.replacen("<Root PresetName=\\\"Custom\\\" MajorVersion=\\\"4\\\" MinorVersion=\\\"2\\\">",
+          "<Root PresetName=\\\"Custom\\\" MajorVersion=\\\"4\\\" MinorVersion=\\\"2\\\"><KeyboardLayout>en-US</KeyboardLayout>",1);
+        let changes=[c()];
+        let output=named_xml(&source,"EDCH_PIED_AZERTY_COMBAT",&changes,true).unwrap();
+        assert!(output.contains("PresetName=\\\"EDCH_PIED_AZERTY_COMBAT\\\""));
+        assert!(output.contains("<KeyboardLayout>fr-FR</KeyboardLayout>"));
+        verify_named_output(&output,"EDCH_PIED_AZERTY_COMBAT",&changes).unwrap();
+        assert!(verify_named_output(&output,"EDCH_PIED_AZERTY_POLY",&changes).is_err());
+    }
+    #[test]
+    fn named_profile_write_preflight_refuses_empty_or_invalid_data() {
+        assert!(named_xml(XML,"EDCH_PIED_AZERTY_POLY",&[],false).is_err());
+        assert!(named_xml(XML,"EDCH_PIED_AZERTY_POLY",&[c()],true).is_err());
+        assert!(named_xml(XML,"Custom",&[c()],false).is_err());
+    }
     #[test] fn new_slot_preserves_existing_hotkey(){let s=rewrite_xml(XML,"EDCHPro001",&c()).unwrap();assert!(s.contains("<Primary Device=\"Keyboard\" Key=\"Key_A\" />"));assert!(s.contains("<Secondary Device=\"SaitekX52Pro\" Key=\"Joy_2\" />"));assert!(s.contains("<HyperSuperCombination>"));}
     #[test] fn refuse_override_by_default(){let mut x=c();x.slot="primary".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());x.replace_existing=true;assert!(rewrite_xml(XML,"EDCHPro001",&x).is_ok());}
     #[test] fn captured_keyboard_codes_are_strictly_bounded() {
