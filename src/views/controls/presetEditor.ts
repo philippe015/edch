@@ -18,7 +18,7 @@ import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
 import { virtualFootMouse } from "./virtualFootMouse.js";
-import {ENERGY_LINK_ACTION,ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
+import {ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
