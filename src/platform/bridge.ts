@@ -348,6 +348,13 @@ export const controlsSaveNamedPresetBatch = (
   updateExisting:boolean, frenchAzerty:boolean,
 ):Promise<ControlsPresetResult> => invoke<ControlsPresetResult>("controls_save_named_preset_batch",
   {sourceFile,changes,presetName,updateExisting,frenchAzerty});
+export interface LegacyArchiveResult {
+  archived:string[];
+  skipped:string[];
+  backup_dir:string;
+}
+export const controlsArchiveLegacyPresets=(selectedFile:string):Promise<LegacyArchiveResult>=>
+  invoke<LegacyArchiveResult>("controls_archive_legacy_presets",{selectedFile});
 /** v1.6.7: optional Linux joystick inspection. Raw indexes are NOT game .binds IDs. */
 export interface HotasDevice { id: string; name: string; vendor?: string | null; product?: string | null; readable: boolean; }
 export interface HotasEvent { deviceId: string; kind: "button" | "axis"; inputIndex: number; value: number; }
