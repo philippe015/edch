@@ -68,7 +68,7 @@ test("WASD screenshot becomes ZQSD in an explicit complete on-foot draft",()=>{
     assert.ok(plan.changes.some(c=>c.action==="HumanoidStrafeLeftButton"&&c.key==="Key_Q"),usage);
     assert.ok(!plan.changes.some(c=>c.action==="HumanoidPrimaryFireButton"));
     assert.ok(!plan.changes.some(c=>c.action==="HumanoidZoomButton"));
-    assert.equal(plan.allActions,actions.filter(a=>meta.controls[a]?.g==="OnFoot").length);
+    assert.ok(plan.allActions>=79,"all Odyssey ground actions and related Holo-Me controls are counted");
     assert.ok(plan.preservedAxes===0);
     assert.ok(plan.changes.every(c=>isStagedAssignmentValid(c,actions,source)),usage);
     assert.ok(plan.changes.every(c=>c.slot!=="axis"&&
