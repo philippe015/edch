@@ -3,7 +3,7 @@
  */
 import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset, groupOf } from "../../features/controls/binds.js";
 import { localizedActionLabel} from "../../features/controls/actionLabels.js";
-import { controlsSaveNamedPresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
+import { controlsSaveNamedPresetBatch, controlsArchiveLegacyPresets, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
   type PresetAssignment, type SuggestedProfile,
@@ -63,6 +63,7 @@ export class ControlsPresetEditor {
   private profile:SuggestedProfile="balanced";
   private customPresetName="";
   private confirmNamedUpdate=false;
+  private archivingLegacy=false;
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
   private editInput="";
@@ -105,6 +106,7 @@ export class ControlsPresetEditor {
     const targetName=this.customPresetName || namedPreset(this.mode,this.family,this.profile);
     const sameNamedFiles=matchedPresetFiles(targetName,names);
     const existingNamed=sameNamedFiles.length>0;
+    const legacyFiles=names.filter(name=>/^EDCHPro[0-9]{3,5}[.]4[.][0-9]{1,2}[.]binds$/i.test(name));
     const deviceAdvice=src&&this.family!=="xbox"
       ?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
     const xboxAdvice=src&&this.family==="xbox"
@@ -380,8 +382,15 @@ export class ControlsPresetEditor {
         h("label",null,h("input",{type:"checkbox",checked:this.confirmNamedUpdate,
           onchange:(e:Event)=>{this.confirmNamedUpdate=(e.target as HTMLInputElement).checked;this.repaint();}}),
           " Mettre à jour ce profil nommé. Sauvegarder automatiquement l'ancienne version dans EDCH_Backups avant remplacement.")):null,
-      h("p.edch-c166-muted",null,
-        "Les anciens EDCHPro restent intacts. Pour éviter des noms en double, conserve ce même nom pour les mises à jour de ce réglage."),
+      legacyFiles.length?h("details.edch-named-legacy",null,
+        h("summary",null,legacyFiles.length+" ancien(s) profil(s) EDCHPro détecté(s)"),
+        h("p.edch-c166-muted",null,
+          "Ils restent dans Odyssey tant qu'ils ne sont pas archivés. La commande ci-dessous ne déplace que les anciens profils vérifiés, inactifs et non sélectionnés. Ils sont sauvegardés dans EDCH_Backups."),
+        ...legacyFiles.slice(0,25).map(file=>h("p.edch-c166-muted",null,file)),
+        btn(this.archivingLegacy?"Archivage…":"Archiver les anciens EDCHPro inutilisés",
+          ()=>{void this.archiveLegacyPresets();},
+          !isTauri()||isRemote()||this.archivingLegacy||this.saving||this.loading),
+      ):h("p.edch-c166-muted",null,"Aucun ancien profil EDCHPro numéroté détecté."),
     );
     const footCoverage=completeFoot?h("section.edch-foot-coverage",null,
       h("h4",null,"Couverture des commandes à pied · AZERTY étendu"),
@@ -710,6 +719,22 @@ export class ControlsPresetEditor {
       await ctx.reload();
     }catch(e){this.inGameGuideMessage="Relecture des commandes impossible : "+String(e);}
     finally{this.inGameGuideBusy=false;this.repaint();}
+  }
+  private async archiveLegacyPresets(){
+    if(!isTauri()||isRemote()||this.archivingLegacy||this.saving||this.loading)return;
+    if(!window.confirm("Archiver UNIQUEMENT les anciens EDCHPro numérotés inutilisés ?\\n"+
+      "Ils seront déplacés dans EDCH_Backups, jamais supprimés.\\n"+
+      "Le profil sélectionné et les profils actifs dans Odyssey resteront intacts.\\n"+
+      "Ferme le jeu et son lanceur avant de continuer."))return;
+    const ctx=this.context;if(!ctx)return;
+    this.archivingLegacy=true;this.repaint();
+    try{
+      const output=await controlsArchiveLegacyPresets(this.selected);
+      this.message=output.archived.length+" ancien(s) profil(s) archivé(s) dans "+
+        output.backup_dir+". "+output.skipped.length+" conservé(s)/ignoré(s).";
+      await ctx.reload();
+    }catch(e){this.message="Archivage refusé : "+String(e);}
+    finally{this.archivingLegacy=false;this.repaint();}
   }
   private async save(){
     const ctx=this.context,source=this.source;
