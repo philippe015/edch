@@ -111,7 +111,7 @@ test("on-foot interface displays real bindings, helpful actions and optional sho
   for(const phrase of ["Recharge de la combinaison · Energy Link",
     "energyLinkPlan","ENERGY_LINK_RELATED","Voir / configurer",
     "Préparer Energy Link sur la touche 3","this.stageAdvice",
-    "controlsSavePresetBatch","this.query=item.action"])
+    "controlsSaveNamedPresetBatch","this.query=item.action"])
     assert.ok(editor.includes(phrase),phrase);
   assert.ok(css.includes(".edch-energylink-action"));
   assert.ok(html.includes("energylink-v1617.css"));
