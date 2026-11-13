@@ -131,14 +131,14 @@ fn rewrite_slot(body: &str, change: &ControlsChange) -> Result<String, String> {
     };
     Ok(format!("{}{}{}",&body[..start],replacement,&body[end..]))
 }
-fn rewrite_xml(xml: &str, preset: &str, change: &ControlsChange) -> Result<String, String> {
+fn rewrite_xml_validated(xml: &str, preset: &str, change: &ControlsChange, source_xml: &str) -> Result<String, String> {
     if xml.len() > 5_000_000 || xml.contains("<!DOCTYPE") || xml.contains("<!ENTITY") || !xml.contains("</Root>")
         || !token(preset,40) {return Err("unsafe, invalid or oversized binds XML".into());}
     let root_start=xml.find("<Root ").ok_or("Root missing")?;
     let root_end=root_start+xml[root_start..].find('>').ok_or("invalid Root")?+1;
     let root=&xml[root_start..root_end];
     if attr(root,"MajorVersion").as_deref() != Some("4") {return Err("Odyssey v4 binding format required".into());}
-    input_check(xml,change)?;
+    input_check(source_xml,change)?;
     let action_open=format!("<{}>",change.action);
     let action_end=format!("</{}>",change.action);
     let at=xml.find(&action_open).ok_or("action not in selected profile")?;
@@ -152,6 +152,10 @@ fn rewrite_xml(xml: &str, preset: &str, change: &ControlsChange) -> Result<Strin
     let output=revised.replacen(root,&next_root,1);
     if output.len() > 5_000_000 {return Err("output too large".into());}
     Ok(output)
+}
+
+fn rewrite_xml(xml: &str, preset: &str, change: &ControlsChange) -> Result<String, String> {
+    rewrite_xml_validated(xml,preset,change,xml)
 }
 
 /// Creates a NEW preset in Elite Dangerous's Options/Bindings; user selects it in-game.
@@ -192,13 +196,13 @@ pub async fn controls_save_preset(source_file: String, change: ControlsChange) -
         }
         return Ok(ControlsPresetResult{preset,filename,path:dest.to_string_lossy().to_string()});
     }
-    Err("EDCHPro profile namespace full".into())
+    Err("No unused preset display name available (existing profiles preserved)".into())
 }
 
 
 /// Safely applies a reviewed list of changes to ONE new profile. Never edits the source.
 fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Result<String, String> {
-    if changes.is_empty() || changes.len() > 40 {
+    if changes.is_empty() || changes.len() > 64 {
         return Err("between 1 and 40 confirmed changes required".into());
     }
     let mut used = HashSet::new();
@@ -211,11 +215,55 @@ fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Res
     }
     let mut result = xml.to_owned();
     for change in changes {
-        // This strict operation can reject a candidate if an earlier edit removed its
-        // sole known appearance: fail safely rather than inventing device inputs.
-        result = rewrite_xml(&result, preset, change)?;
+        // A previous stage might remove the only old occurrence of a mouse key.
+        // All inputs have already been validated against the original XML.
+        result = rewrite_xml_validated(&result, preset, change, xml)?;
     }
+    verify_profile_changes(&result,changes)?;
     Ok(result)
+}
+
+/// Check the final XML itself: the game must receive every reviewed assignment.
+fn verify_profile_changes(xml: &str, changes: &[ControlsChange]) -> Result<(), String> {
+    for change in changes {
+        let action=format!("<{}>",change.action);
+        let end_tag=format!("</{}>",change.action);
+        let at=xml.find(&action).ok_or("generated action missing")?+action.len();
+        let end=at+xml[at..].find(&end_tag).ok_or("generated action not closed")?;
+        let slot=if change.slot=="primary" {"Primary"} else {"Secondary"};
+        let prefix=format!("<{slot} ");
+        let inner=&xml[at..end];
+        let pos=inner.find(&prefix).ok_or("generated binding slot missing")?;
+        let stop=pos+inner[pos..].find('>').ok_or("generated binding tag invalid")?+1;
+        let tag=&inner[pos..stop];
+        if attr(tag,"Device").as_deref()!=Some(change.device.as_str()) ||
+           attr(tag,"Key").as_deref()!=Some(change.key.as_str()) {
+            return Err(format!("generated binding mismatch for {}",change.action));
+        }
+    }
+    Ok(())
+}
+
+/// Unique, game-readable display name matching the filename and PresetName.
+fn named_preset_candidate(base: &str, attempt: usize) -> Result<String,String> {
+    if !token(base,40) || !base.starts_with("EDCH_") {
+        return Err("preset name must be an EDCH_ identifier of max 40 ASCII characters".into());
+    }
+    let suffix=if attempt==1 {String::new()} else {format!("_{attempt:02}")};
+    let prefix=base.get(..40usize.saturating_sub(suffix.len())).ok_or("invalid name")?;
+    Ok(format!("{prefix}{suffix}"))
+}
+fn preset_name_present(dir: &Path, name: &str) -> Result<bool,String> {
+    let prefix=format!("{name}.");
+    for item in fs::read_dir(dir).map_err(|e|e.to_string())? {
+        let entry=item.map_err(|e|e.to_string())?;
+        let file=entry.file_name();
+        let file=file.to_string_lossy();
+        if file.starts_with(&prefix)&&file.to_ascii_lowercase().ends_with(".binds") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Generates a new EDCHProNNN profile with all confirmed changes, in one create_new write.
@@ -223,12 +271,13 @@ fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Res
 pub async fn controls_save_preset_batch(
     source_file: String,
     changes: Vec<ControlsChange>,
+    requested_preset_name: Option<String>,
 ) -> Result<ControlsPresetResult, String> {
     if !crate::app::game_running().await.is_empty() {
         return Err("Close Elite Dangerous and launcher before generating a profile".into());
     }
     if !filename_valid(&source_file) { return Err("invalid source filename".into()); }
-    if changes.is_empty() || changes.len() > 40 { return Err("1–40 changes required".into()); }
+    if changes.is_empty() || changes.len() > 64 { return Err("1–64 changes required".into()); }
     let base = Path::new(&crate::options::options_dir()?).join("Bindings");
     let path = base.join(&source_file);
     let meta = fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
@@ -245,13 +294,28 @@ pub async fn controls_save_preset_batch(
         return Err("unsupported Odyssey profile version".into());
     }
     // Preflight the entire rewrite before creating any destination file.
-    let validate = rewrite_xml_batch(&xml, "EDCHPro001", &changes)?;
+    let requested=requested_preset_name.as_deref();
+    let preflight_name=match requested {
+        Some(name)=>named_preset_candidate(name,1)?,
+        None=>"EDCHPro001".to_string(),
+    };
+    let validate = rewrite_xml_batch(&xml, &preflight_name, &changes)?;
     if validate.len() > 5_000_000 { return Err("profile too large".into()); }
     for n in 1..=999 {
-        let preset = format!("EDCHPro{n:03}");
+        let preset = match requested {
+            Some(name)=>named_preset_candidate(name,n)?,
+            None=>format!("EDCHPro{n:03}"),
+        };
+        // Keep display names unique even across Odyssey minor versions.
+        if preset_name_present(&base,&preset)? {continue;}
         let filename = format!("{preset}.{major}.{minor}.binds");
         let path = base.join(&filename);
         let changed = if n == 1 { validate.clone() } else { rewrite_xml_batch(&xml, &preset, &changes)? };
+        let root_at=changed.find("<Root ").ok_or("generated Root missing")?;
+        let root_end=root_at+changed[root_at..].find('>').ok_or("invalid generated Root")?+1;
+        if attr(&changed[root_at..root_end],"PresetName").as_deref()!=Some(preset.as_str()) {
+            return Err("generated display name mismatch".into());
+        }
         let mut file = match OpenOptions::new().write(true).create_new(true).open(&path) {
             Ok(file) => file,
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -330,7 +394,7 @@ mod tests {
     fn batch_reject_duplicates_and_overlimit() {
         assert!(rewrite_xml_batch(XML,"EDCHPro001",&[c(),c()]).is_err());
         assert!(rewrite_xml_batch(XML,"EDCHPro001",&[]).is_err());
-        assert!(rewrite_xml_batch(XML,"EDCHPro001",&vec![c();41]).is_err());
+        assert!(rewrite_xml_batch(XML,"EDCHPro001",&vec![c();65]).is_err());
     }
     #[test]
     fn batch_rejects_unsupported_input_and_occupied_primary() {
