@@ -44,7 +44,7 @@ test("mouse capture remains an explicit, separate click zone",()=>{
   assert.ok(zone.includes("onmousedown:(e:MouseEvent)=>"),"mouse zone handles button capture");
   const beforeMouseZone=zone.slice(0,zone.indexOf('h("div.edch-c166-capture-mouse-zone"'));
   assert.doesNotMatch(beforeMouseZone,/onmousedown:/,"dialog and keyboard must not capture Mouse_1 on click");
-  assert.ok(zone.includes("captureVirtualFootKey(key)"),"virtual key uses keyboard input helper");
+  assert.ok(editor.includes("captureVirtualFootKey(key)"),"virtual key uses keyboard input helper");
   assert.ok(zone.includes("captureMode:true"));
 });
 
