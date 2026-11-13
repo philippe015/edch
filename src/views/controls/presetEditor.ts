@@ -17,6 +17,8 @@ import { GAME_SECTIONS, PREPARED_TEMPLATES, prepareAzerty, sectionForAction } fr
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
+import { virtualFootMouse } from "./virtualFootMouse.js";
+import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
@@ -46,6 +48,7 @@ export class ControlsPresetEditor {
   private section="all";
   private inspectedKey="";
   private inspectedXbox="";
+  private inspectedMouse="";
   private profile:SuggestedProfile="balanced";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
@@ -75,8 +78,13 @@ export class ControlsPresetEditor {
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
     const src=this.source?.filename===this.selected?this.source:undefined;
-    const inputs=src ? detectedInputs(src.binds,this.family,meta)
-      .filter(b=>this.family!=="xbox" || (isXboxDevice(b.device,meta)&&xboxControl(b.device,b.key,meta)!==null)) : [];
+    const inputs=src ? [
+      ...detectedInputs(src.binds,this.family,meta)
+        .filter(b=>this.family!=="xbox" || (isXboxDevice(b.device,meta)&&xboxControl(b.device,b.key,meta)!==null)),
+      ...(this.mode==="foot"&&this.family==="azerty"?digitalMouseInputs(src.binds):[]),
+    ] : [];
+    const footMousePlan=src&&this.mode==="foot"&&this.family==="azerty"
+      ?recommendFootMouse(src.actions,src.binds,meta):undefined;
     const deviceAdvice=src&&this.family!=="xbox"
       ?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
     const xboxAdvice=src&&this.family==="xbox"
@@ -99,7 +107,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils intelligents v1.6.14"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · Clavier + Souris à pied v1.6.16"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -110,7 +118,7 @@ export class ControlsPresetEditor {
           if(this.staged.length&&!window.confirm("Changer de périphérique et abandonner le brouillon non enregistré ?"))return;
           this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";
           this.repaint();
-        }},x.label)));
+        }},x.id==="azerty"&&this.mode==="foot"?"Clavier AZERTY + souris":x.label)));
     const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
       placeholder:"Rechercher une commande française ou son identifiant…",oninput:(e:Event)=>{
         this.query=(e.target as HTMLInputElement).value;this.repaint("search");
@@ -145,7 +153,7 @@ export class ControlsPresetEditor {
         h("span",null,`${rows.length} commande(s)`)),
       h("p.edch-c166-muted",null,currentContext.description),
       h("h4",null,"Choisir le périphérique"),topTabs,
-      h("p.edch-c166-muted",null,`${inputs.length} entrée(s) de ce type réellement présentes dans le fichier source.`),
+      h("p.edch-c166-muted",null,`${inputs.length} entrée(s) reconnue(s) dans le fichier source${this.mode==="foot"&&this.family==="azerty"?" (clavier et boutons de souris)":""}.`),
       sectionTabs,search,table);
     const chooseInput=h("select",{value:this.editInput,disabled:this.saving||!src,
       onchange:(e:Event)=>{this.editInput=(e.target as HTMLSelectElement).value;this.repaint();}},...inputs.map(i=>choose(readKey(i),bindingKey(i),this.editInput===bindingKey(i))));
@@ -154,7 +162,7 @@ export class ControlsPresetEditor {
       selectedAction ? h("div",null,
         h("p.edch-c166-keyname",null,localizedActionLabel(meta,selectedAction)),
         h("p.edch-c166-muted",null,`${labelSlot(this.editSlot)} · actuelle : ${readKey(old)}`),
-        h("label.edch-c166-field",null,`Bouton reconnu — ${INPUT_FAMILIES.find(x=>x.id===this.family)!.label}`,chooseInput),
+        h("label.edch-c166-field",null,`Bouton reconnu — ${this.mode==="foot"&&this.family==="azerty"?"Clavier AZERTY + souris":INPUT_FAMILIES.find(x=>x.id===this.family)!.label}`,chooseInput),
         old?h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.replace,onchange:(e:Event)=>{
           this.replace=(e.target as HTMLInputElement).checked;this.repaint();}})," Remplacer cet emplacement dans le nouveau profil"):null,
         btn("Ajouter au brouillon",()=>this.stageSingle(meta),!selectedInput||(Boolean(old)&&!this.replace)||this.loading||this.saving,"primary"),
@@ -174,12 +182,16 @@ export class ControlsPresetEditor {
             ?recommendXboxProfile(this.mode,style.id,src.actions,src.binds,meta):undefined;
           const inferred=src&&this.family==="hotas"
             ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
-          const changes=prepared?.changes??intelligent?.changes??inferred?.changes??[];
-          const covered=prepared?.covered??intelligent?.covered??inferred?.covered??0;
-          const skipped=prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0;
+          const footMouse=src&&this.mode==="foot"&&this.family==="azerty"
+            ?recommendFootMouse(src.actions,src.binds,meta):undefined;
+          const changes=[...(prepared?.changes??intelligent?.changes??inferred?.changes??[]),
+            ...(footMouse?.changes??[])];
+          const covered=(prepared?.covered??intelligent?.covered??inferred?.covered??0)+(footMouse?.covered??0);
+          const skipped=(prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0)
+            +(footMouse?.skipped.length??0);
           const replacements=changes.filter(c=>c.replaceExisting).length;
           const detail=this.family==="azerty"
-            ?template.description
+            ?template.description+(this.mode==="foot"?" Tir et zoom souris ajoutés uniquement si les boutons sont reconnus.":"")
             :this.family==="xbox"
               ?XBOX_STYLES[style.id].description+" Analyse des boutons reconnus, sans écraser les axes."
               :"Utilise les boutons déjà présents dans le profil X52 Pro / HOTAS. Aucun bouton inventé.";
@@ -205,7 +217,7 @@ export class ControlsPresetEditor {
         }),
       ),
       this.family==="azerty"
-        ?h("p.edch-c166-muted",null,"Ces profils AZERTY sont des propositions Cyberpunk Philou, pas les réglages officiels par défaut. Les touches occupées peuvent être ignorées ; vérifie toujours le brouillon.")
+        ?h("p.edch-c166-muted",null,"Profils suggérés (non officiels). À pied : souris 1 = tir, souris 2 = zoom, souris 3 = interaction secondaire seulement si ces boutons existent dans le .binds et sont libres. Vérifie le brouillon.")
         :h("p.edch-c166-muted",null,"X52 Pro/Xbox : les axes restent inchangés. Seules les affectations réellement reconnues dans le profil source peuvent être reprises."),
     );
     const adviceBox=h("section.edch-c166-pane",null,
@@ -231,6 +243,15 @@ export class ControlsPresetEditor {
         .map(w=>h("p.edch-c166-muted",null,w)),
       btn("Préparer les suggestions",()=>this.stageAdvice(this.family==="xbox"?xboxAdvice:deviceAdvice),
         !(this.family==="xbox"?xboxAdvice:deviceAdvice)?.changes.length||this.loading||this.saving,"primary"),
+      this.mode==="foot"&&this.family==="azerty"&&footMousePlan?
+        h("div.edch-foot-mouse-prepare",null,
+          h("h5",null,"Souris à pied · raccourcis sûrs"),
+          h("p.edch-c166-muted",null,
+            `${footMousePlan.covered} déjà correct(s) · ${footMousePlan.changes.length} nouveau(x) bouton(s) proposé(s) · ${footMousePlan.skipped.length} ignoré(s).`),
+          btn("Préparer les boutons souris",()=>this.stageAdvice(footMousePlan),
+            !footMousePlan.changes.length||this.loading||this.saving),
+          h("p.edch-c166-muted",null,
+            "Uniquement les boutons présents dans le fichier source. Aucun axe ni touche existante remplacé.")):null,
       h("p.edch-c166-muted",null,"Le brouillon ne modifie aucun fichier. Les touches occupées et les axes analogiques sont préservés."));
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
@@ -293,6 +314,16 @@ export class ControlsPresetEditor {
         this.repaint("keyboard");
       },
     }) : null;
+    const footMouse=this.family==="azerty"&&this.mode==="foot" ? virtualFootMouse({
+      meta,original:src?.binds??[],draft:this.staged,sourceLoaded:Boolean(src),
+      selected:this.inspectedMouse,
+      onSelect:(id)=>{
+        this.inspectedMouse=id;
+        const mouse=inputs.find(b=>b.device==="Mouse"&&b.key===id);
+        if(mouse)this.editInput=bindingKey(mouse);
+        this.repaint("mouse");
+      },
+    }) : null;
     this.host=h("section.card.edch-controls-write-v166",null,heading,
       h("p.edch-c166-muted",{style:{padding:"0 16px"}},
         "Onglet : "+currentContext.label+" · Interface / cartes et diagnostics complémentaires dans les outils avancés."), 
@@ -301,6 +332,7 @@ export class ControlsPresetEditor {
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       quickCards,
       azertyKeyboard,
+      footMouse,
       xboxDiagram,
       h("div.edch-c166-layout",null,rowPane,right),
       modeProfiles,
@@ -308,13 +340,17 @@ export class ControlsPresetEditor {
     return this.host;
   }
 
-  private repaint(focus?:"search"|"keyboard"|"xbox") {
+  private repaint(focus?:"search"|"keyboard"|"xbox"|"mouse") {
     const c=this.context;
     if (!this.host?.isConnected||!c)return;
     this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));
     if(focus==="keyboard"&&this.inspectedKey){
       const next=this.host.querySelector<HTMLButtonElement>('button.edch-vkb-key[data-key="'+this.inspectedKey+'"]');
       next?.focus({preventScroll:true});
+    }
+    if(focus==="mouse"&&this.inspectedMouse){
+      const btn=this.host.querySelector<HTMLButtonElement>('button.edch-mouse-btn[data-mouse-control="'+this.inspectedMouse+'"]');
+      btn?.focus({preventScroll:true});
     }
     if(focus==="xbox"&&this.inspectedXbox){
       const btn=this.host.querySelector<HTMLButtonElement>('button.edch-xbox-control[data-xbox-control="'+this.inspectedXbox+'"]');
