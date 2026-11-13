@@ -1,0 +1,60 @@
+/* EDCH Cyberpunk Philou v1.6.14 — interactive Xbox controller surface and advice. */
+.edch-xbox-panel{margin:12px 16px 18px;padding:16px;min-width:0;border:1px solid #4f6678;
+ border-radius:10px;color:#e4edf5;background:linear-gradient(135deg,#101a25,#192431 70%,#24201a)}
+.edch-xbox-head{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px}
+.edch-xbox-head h4{margin:0 0 8px;font-size:1.1rem;color:#ffbd78}
+.edch-xbox-head p{font-size:.83rem;color:#bacad7;max-width:710px;margin:0 0 7px}
+.edch-xbox-legend{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:.74rem;color:#d4e3ec}
+.edch-xbox-legend span{display:inline-flex;align-items:center;gap:5px}
+.edch-xbox-dot{display:inline-block;width:12px;height:12px;background:#304254;
+ border:1px solid #788a9d;border-radius:50%}
+.edch-xbox-dot.assigned{background:#236469;border-color:#7fcece}
+.edch-xbox-dot.planned{background:#805122;border-color:#ffbf75}
+.edch-xbox-devices{font-size:.78rem;color:#c4dcd4}
+.edch-xbox-scroll{overflow-x:auto;padding:10px 0 14px;scrollbar-width:thin;max-width:100%}
+.edch-xbox-scroll:focus-visible{outline:2px solid #ffc082}
+.edch-xbox-stage{position:relative;width:100%;max-width:760px;min-width:560px;
+ aspect-ratio:2 / 1;margin:auto}
+.edch-xbox-outline{position:absolute;inset:0;display:block;width:100%;height:100%;
+ pointer-events:none}
+.edch-xbox-shell{fill:#253847;stroke:#7594a7;stroke-width:4}
+.edch-xbox-part{fill:#16242f;stroke:#6e8798;stroke-width:3}
+.edch-xbox-stick{fill:#192a35;stroke:#577f8e;stroke-width:6}
+.edch-xbox-control{position:absolute!important;transform:translate(-50%,-50%);
+ display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;
+ min-width:36px!important;min-height:28px!important;padding:4px 6px!important;
+ background:#243848!important;color:#f4f8fc!important;border:1px solid #8aa6b7!important;
+ border-radius:16px!important;box-shadow:0 1px 4px #0007;cursor:pointer!important;
+ font-weight:800;font-size:.75rem;line-height:1.1;z-index:1}
+.edch-xbox-control.axis{min-width:39px!important;font-size:.64rem;border-style:dashed!important}
+.edch-xbox-control.trigger{border-radius:6px!important;min-width:48px!important}
+.edch-xbox-control.stick{width:44px;height:44px;border-radius:50%!important}
+.edch-xbox-control.assigned{background:#245962!important;border-color:#85d6d5!important}
+.edch-xbox-control.planned{background:#714923!important;border-color:#ffc078!important}
+.edch-xbox-control.selected{outline:3px solid #ffdbaa!important;outline-offset:1px}
+.edch-xbox-control:hover{filter:brightness(1.22)}
+.edch-xbox-control:focus-visible{outline:3px solid #ffdbaa!important;outline-offset:3px}
+.edch-xbox-label{white-space:nowrap}
+.edch-xbox-count{position:absolute;right:-6px;top:-8px;display:grid;place-items:center;
+ min-width:16px;height:16px;padding:0 2px;color:#fff;background:#516a88;border:1px solid #9bb5c3;
+ border-radius:50%;font-size:.61rem}
+.edch-xbox-inspector{margin-top:12px;border:1px solid #4b6575;border-radius:8px;
+ padding:13px;background:#0f1a26}
+.edch-xbox-inspector h5{margin:0 0 8px;color:#ffd29a;font-size:.93rem}
+.edch-xbox-detail-list{display:grid;gap:8px}
+.edch-xbox-detail-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px 12px;
+ border-bottom:1px solid #33475a;padding:7px 2px;font-size:.81rem}
+.edch-xbox-detail-row strong{color:#f4f6fa}
+.edch-xbox-detail-row small{color:#bccad6;overflow-wrap:anywhere}
+.edch-xbox-tag{font-size:.67rem;border:1px solid #84cbc9;color:#b8e2df;
+ padding:2px 6px;border-radius:4px}
+.edch-xbox-tag.planned{border-color:#e1ad6c;color:#ffdaa4}
+.edch-xbox-unknown{margin-top:14px;font-size:.78rem;color:#bcd0dc}
+.edch-xbox-unknown summary{cursor:pointer;color:#e6c29c}
+.edch-xbox-unknown div{padding:5px 0;border-bottom:1px solid #344452}
+.edch-xbox-foot{margin:13px 0 0;color:#a7b8c7;font-size:.77rem}
+.edch-xbox-plan-skips summary{cursor:pointer;color:#f4bb85}
+@media(max-width:870px){.edch-xbox-panel{margin:10px 0;padding:12px}
+ .edch-xbox-stage{margin-left:0}}
+@media print{.edch-xbox-scroll{overflow:visible}
+ .edch-xbox-control{border-color:#000!important}}
