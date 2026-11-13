@@ -1,0 +1,60 @@
+name: EDCH Cyberpunk Philou — Energy Link v1.6.17
+on:
+  push:
+    branches:
+      - 'feat/odyssey-energylink-raccourci-v1.6.17-*'
+  pull_request:
+    paths:
+      - 'src/features/controls/energyLink.ts'
+      - 'src/features/controls/preparedProfiles.ts'
+      - 'src/features/controls/preparedKeys.ts'
+      - 'src/views/controls/presetEditor.ts'
+      - 'src-tauri/src/controls_preset.rs'
+      - 'public/energylink-v1617.css'
+      - 'public/index.html'
+      - 'test/odyssey-energylink-v1617.test.mjs'
+      - '.github/workflows/edch-energylink-v1617.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: edch-energy-link-v1617-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  frontend-and-regressions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - name: Build TypeScript
+        run: npm run build
+      - name: All JavaScript tests
+        run: node --test test/*.test.mjs
+  native-binds-safety:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libgtk-3-dev libsoup-3.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build frontend before Rust
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Native binding validations
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Native compile
+        run: cargo check --manifest-path src-tauri/Cargo.toml
