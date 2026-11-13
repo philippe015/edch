@@ -203,7 +203,7 @@ pub async fn controls_save_preset(source_file: String, change: ControlsChange) -
 /// Safely applies a reviewed list of changes to ONE new profile. Never edits the source.
 fn rewrite_xml_batch(xml: &str, preset: &str, changes: &[ControlsChange]) -> Result<String, String> {
     if changes.is_empty() || changes.len() > 64 {
-        return Err("between 1 and 40 confirmed changes required".into());
+        return Err("between 1 and 64 confirmed changes required".into());
     }
     let mut used = HashSet::new();
     // Validate against the unchanged source before rewriting any slot.
@@ -281,7 +281,7 @@ fn rename_profile_root(xml:&str, name:&str) -> Result<String,String> {
     let next=set_attr(root,"PresetName",name)?;
     Ok(xml.replacen(root,&next,1))
 }
-/// Generates a new EDCHProNNN profile with all confirmed changes, in one create_new write.
+/// Generates a unique descriptive EDCH preset with all reviewed changes (or a named copy).
 #[tauri::command]
 pub async fn controls_save_preset_batch(
     source_file: String,
@@ -419,7 +419,7 @@ mod tests {
     #[test]
     fn descriptive_name_matches_xml_and_uniqueness_suffix() {
         let created=rename_profile_root(XML,"EDCH_PIED_AZERTY").unwrap();
-        assert!(created.contains("PresetName=\\"EDCH_PIED_AZERTY\\""));
+        assert!(created.contains(r#"PresetName="EDCH_PIED_AZERTY""#));
         assert_eq!(named_preset_candidate("EDCH_PIED_AZERTY",2).unwrap(),"EDCH_PIED_AZERTY_02");
         assert!(named_preset_candidate("../unsafe",1).is_err());
         assert!(named_preset_candidate("EDCH_é",1).is_err());
@@ -429,7 +429,7 @@ mod tests {
     fn completed_output_is_checked_for_each_real_key() {
         let changed=rewrite_xml_batch(XML,"EDCH_PIED_AZERTY",&[c()]).unwrap();
         assert!(verify_profile_changes(&changed,&[c()]).is_ok());
-        let invalid=changed.replace("Key=\\"Joy_2\\" />","Key=\\"Joy_900\\" />");
+        let invalid=changed.replace(r#"Key="Joy_2" />"#,r#"Key="Joy_900" />"#);
         assert!(verify_profile_changes(&invalid,&[c()]).is_err());
     }
     #[test]
