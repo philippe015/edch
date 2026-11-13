@@ -176,3 +176,24 @@ export function missingFootMovement(
     return !hasNew&&!hasOld;
   });
 }
+
+/** Combine full keyboard and optional mouse suggestions without assigning a slot
+ * twice. For example, secondary interact gets F (primary) and can receive Mouse_3
+ * (secondary), but only if that slot is actually free in the source.
+ */
+export function mergeFootKeyboardMouse(
+  keyboard:readonly PresetAssignment[],mouse:readonly PresetAssignment[],
+  source:readonly Bind[],
+):PresetAssignment[] {
+  const combined=keyboard.map(k=>({...k,modifiers:[...k.modifiers]}));
+  for(const item of mouse){
+    let slot=item.slot;
+    const used=(s:string)=>combined.some(c=>c.action===item.action&&c.slot===s)||
+      source.some(c=>c.action===item.action&&c.slot===s);
+    if(used(slot))slot=slot==="primary"?"secondary":"primary";
+    if(used(slot))continue;
+    if(combined.length>=64)break;
+    combined.push({...item,slot:slot as "primary"|"secondary",replaceExisting:false});
+  }
+  return combined;
+}
