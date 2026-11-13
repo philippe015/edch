@@ -116,6 +116,9 @@ test("frontend passes names to native writer and blocks incomplete AZERTY ZQSD",
     "ZQSD incomplet","this.staged.length<=64","requestedPresetName"])
     assert.ok(editor.includes(str),str);
   assert.ok(bridge.includes("requestedPresetName: requestedPresetName??null"));
+  assert.ok(editor.includes("edch-c1621-current-preview"));
+  assert.ok(editor.includes('"Proposé : "+change.device+" · "+change.key'));
+
 });
 
 test("complete AZERTY and mouse suggestions never assign the same slot twice",()=>{
