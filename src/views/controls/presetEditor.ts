@@ -17,6 +17,8 @@ import { GAME_SECTIONS, PREPARED_TEMPLATES, prepareAzerty, sectionForAction } fr
 import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
+import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
+import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
 interface SourceState { filename: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
 const ACCEPTED = /^[A-Za-z0-9_]{1,100}$/;
@@ -43,6 +45,7 @@ export class ControlsPresetEditor {
   private query="";
   private section="all";
   private inspectedKey="";
+  private inspectedXbox="";
   private profile:SuggestedProfile="balanced";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
@@ -72,8 +75,12 @@ export class ControlsPresetEditor {
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
     const src=this.source?.filename===this.selected?this.source:undefined;
-    const inputs=src?detectedInputs(src.binds,this.family,meta):[];
-    const deviceAdvice=src?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
+    const inputs=src ? detectedInputs(src.binds,this.family,meta)
+      .filter(b=>this.family!=="xbox" || (isXboxDevice(b.device,meta)&&xboxControl(b.device,b.key,meta)!==null)) : [];
+    const deviceAdvice=src&&this.family!=="xbox"
+      ?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
+    const xboxAdvice=src&&this.family==="xbox"
+      ?recommendXboxProfile(this.mode,this.profile,src.actions,src.binds,meta):undefined;
     const allRows=src?catalogRows(src.actions,src.binds,meta,this.mode,this.query,a=>localizedActionLabel(meta,a)):[];
     const rows=this.section==="all" ? allRows : allRows.filter(row=>sectionForAction(this.mode,row.action,meta)===this.section);
     if (src && this.editAction && !src.actions.includes(this.editAction)) this.editAction="";
@@ -92,7 +99,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils préparés v1.6.12"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils intelligents v1.6.14"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -163,15 +170,19 @@ export class ControlsPresetEditor {
           const template=PREPARED_TEMPLATES.find(t=>t.scope===this.mode&&t.usage===style.id)!;
           const prepared=src&&this.family==="azerty"
             ?prepareAzerty(this.mode,style.id,src.actions,src.binds,meta):undefined;
-          const inferred=src&&this.family!=="azerty"
+          const intelligent=src&&this.family==="xbox"
+            ?recommendXboxProfile(this.mode,style.id,src.actions,src.binds,meta):undefined;
+          const inferred=src&&this.family==="hotas"
             ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
-          const changes=prepared?.changes??inferred?.changes??[];
-          const covered=prepared?.covered??inferred?.covered??0;
-          const skipped=prepared?.skipped.length??inferred?.absent.length??0;
+          const changes=prepared?.changes??intelligent?.changes??inferred?.changes??[];
+          const covered=prepared?.covered??intelligent?.covered??inferred?.covered??0;
+          const skipped=prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0;
           const replacements=changes.filter(c=>c.replaceExisting).length;
           const detail=this.family==="azerty"
             ?template.description
-            :"Utilise les boutons déjà présents dans le profil "+(this.family==="hotas"?"X52 Pro / HOTAS":"Xbox")+". Aucun bouton inventé.";
+            :this.family==="xbox"
+              ?XBOX_STYLES[style.id].description+" Analyse des boutons reconnus, sans écraser les axes."
+              :"Utilise les boutons déjà présents dans le profil X52 Pro / HOTAS. Aucun bouton inventé.";
           const selected=style.id===this.profile;
           return h("article.edch-c1612-profile",{class:selected?"active":""},
             h("div.edch-c1612-profile-title",null,h("strong",null,this.family==="azerty"?template.label:`${style.label} · ${this.family==="hotas"?"HOTAS X52 Pro":"Xbox"}`),
@@ -203,10 +214,18 @@ export class ControlsPresetEditor {
       h("label.edch-c166-field",null,"Profil conseillé",h("select",{value:this.profile,disabled:this.loading||this.saving,
         onchange:(e:Event)=>{this.profile=(e.target as HTMLSelectElement).value as SuggestedProfile;this.repaint();}},
         ...USAGE_STYLES.map(x=>choose(x.label,x.id,x.id===this.profile)))),
-      deviceAdvice?h("p",null,`${deviceAdvice.covered}/${deviceAdvice.relevant} commande(s) déjà configurée(s) sur ce périphérique · ${deviceAdvice.changes.length} proposition(s) sûre(s).`):null,
-      deviceAdvice?.absent.length?h("p.edch-c166-muted",null,`${deviceAdvice.absent.length} action(s) inexistante(s) dans ce .binds : ignorées.`):null,
-      ... (deviceAdvice?.warnings ?? []).map(w=>h("p.edch-c166-muted",null,w)),
-      btn("Préparer les suggestions",()=>this.stageAdvice(deviceAdvice),!deviceAdvice?.changes.length||this.loading||this.saving,"primary"),
+      (this.family==="xbox"?xboxAdvice:deviceAdvice)?h("p",null,
+        this.family==="xbox"
+          ?`${xboxAdvice!.covered}/${xboxAdvice!.relevant} commande(s) déjà configurée(s) · ${xboxAdvice!.changes.length} proposition(s) argumentée(s).`
+          :`${deviceAdvice!.covered}/${deviceAdvice!.relevant} commande(s) déjà configurée(s) · ${deviceAdvice!.changes.length} proposition(s).`):null,
+      this.family==="xbox"&&xboxAdvice?.skipped.length
+        ?h("details.edch-xbox-plan-skips",null,h("summary",null,
+          `${xboxAdvice.skipped.length} action(s) ignorée(s) ou bloquée(s)`),
+          ...xboxAdvice.skipped.slice(0,20).map(x=>h("p.edch-c166-muted",null,x))):null,
+      ...(this.family==="xbox"?xboxAdvice?.warnings??[]:deviceAdvice?.warnings??[])
+        .map(w=>h("p.edch-c166-muted",null,w)),
+      btn("Préparer les suggestions",()=>this.stageAdvice(this.family==="xbox"?xboxAdvice:deviceAdvice),
+        !(this.family==="xbox"?xboxAdvice:deviceAdvice)?.changes.length||this.loading||this.saving,"primary"),
       h("p.edch-c166-muted",null,"Le brouillon ne modifie aucun fichier. Les touches occupées et les axes analogiques sont préservés."));
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
@@ -247,10 +266,20 @@ export class ControlsPresetEditor {
     const right=h("div.edch-c166-right",null,
       hotas,
       this.family==="xbox" ? h("p.edch-c166-muted",null,
-        "Xbox : les boutons doivent d'abord être reconnus et enregistrés dans le jeu. EDCH ne déduit pas la numérotation de Proton.") : null,
+        "Xbox : le schéma identifie les boutons du profil actif. Un clic sélectionne le bouton reconnu pour faciliter son attribution à une commande.") : null,
       this.family==="hotas" ? h("p.edch-c166-muted",null,
         "HOTAS : profils X52 Pro/X56 selon les affectations observées. Les numéros Linux ne sont pas des boutons Elite vérifiés.") : null,
       editBox,adviceBox,draftBox);
+    const xboxDiagram=this.family==="xbox" ? xboxControllerDiagram({
+      meta,scope:this.mode,original:src?.binds??[],draft:this.staged,
+      selected:this.inspectedXbox,sourceLoaded:Boolean(src),
+      onSelect:(control)=>{
+        this.inspectedXbox=control;
+        const match=inputs.find(b=>xboxControl(b.device,b.key,meta)===control);
+        if(match)this.editInput=bindingKey(match);
+        this.repaint("xbox");
+      },
+    }) : null;
     const azertyKeyboard=this.family==="azerty" ? virtualAzertyKeyboard({
       meta,scope:this.mode,original:src?.binds??[],draft:this.staged,
       selectedKey:this.inspectedKey,sourceLoaded:Boolean(src),
@@ -267,19 +296,24 @@ export class ControlsPresetEditor {
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
       quickCards,
       azertyKeyboard,
+      xboxDiagram,
       h("div.edch-c166-layout",null,rowPane,right),
       modeProfiles,
       h("p.edch-c166-credits",null,"Auteur original EDCH : CMDR MDLuffy · Extensions Commandes/BGS : Cyberpunk Philou. Modifications uniquement après validation."));
     return this.host;
   }
 
-  private repaint(focus?:"search"|"keyboard") {
+  private repaint(focus?:"search"|"keyboard"|"xbox") {
     const c=this.context;
     if (!this.host?.isConnected||!c)return;
     this.host.replaceWith(this.render(c.meta,c.files,c.active,c.reload));
     if(focus==="keyboard"&&this.inspectedKey){
       const next=this.host.querySelector<HTMLButtonElement>('button.edch-vkb-key[data-key="'+this.inspectedKey+'"]');
       next?.focus({preventScroll:true});
+    }
+    if(focus==="xbox"&&this.inspectedXbox){
+      const btn=this.host.querySelector<HTMLButtonElement>('button.edch-xbox-control[data-xbox-control="'+this.inspectedXbox+'"]');
+      btn?.focus({preventScroll:true});
     }
     if(focus==="search"){const input=this.host.querySelector<HTMLInputElement>(".edch-c166-search input");if(input){input.focus();input.setSelectionRange(input.value.length,input.value.length);}}
   }
