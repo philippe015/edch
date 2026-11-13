@@ -72,7 +72,7 @@ test("a key already used by an unchanged on-foot command is skipped; not present
   const original=[
     b("HumanoidForwardButton","Key_W"),
     b("HumanoidStrafeLeftButton","Key_Q"),
-    b("HumanoidHealthPack","Key_Z"),
+    b("HumanoidEmoteSlot1","Key_Z"),
     b("HumanoidBackwardButton","Key_S"),
     b("HumanoidStrafeRightButton","Key_D"),
   ];
