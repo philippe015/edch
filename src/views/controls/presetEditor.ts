@@ -3,7 +3,7 @@
  */
 import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset, groupOf } from "../../features/controls/binds.js";
 import { localizedActionLabel} from "../../features/controls/actionLabels.js";
-import { controlsSavePresetBatch, controlsSaveNamedPresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
+import { controlsSaveNamedPresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
   type PresetAssignment, type SuggestedProfile,
@@ -291,13 +291,9 @@ export class ControlsPresetEditor {
           const inferred=src&&this.family==="hotas"
             ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
           // The complete on-foot planner already includes verified mouse suggestions.
-          const footMouse=src&&this.mode==="foot"&&this.family==="azerty"
-            ?undefined:undefined;
-          const changes=[...(prepared?.changes??intelligent?.changes??inferred?.changes??[]),
-            ...(footMouse?.changes??[])];
-          const covered=(prepared?.covered??intelligent?.covered??inferred?.covered??0)+(footMouse?.covered??0);
-          const skipped=(prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0)
-            +(footMouse?.skipped.length??0);
+          const changes=[...(prepared?.changes??intelligent?.changes??inferred?.changes??[])];
+          const covered=prepared?.covered??intelligent?.covered??inferred?.covered??0;
+          const skipped=prepared?.skipped.length??intelligent?.skipped.length??inferred?.absent.length??0;
           const replacements=changes.filter(c=>c.replaceExisting).length;
           const detail=this.family==="azerty"
             ?template.description+(this.mode==="foot"?" Tir et zoom souris ajoutés uniquement si les boutons sont reconnus.":"")
