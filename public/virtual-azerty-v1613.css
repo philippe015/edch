@@ -28,6 +28,9 @@
 .edch-vkb-key.selected{outline:2px solid #ffe6bf!important;outline-offset:1px!important}
 .edch-vkb-key:focus-visible{outline:3px solid #ffe6bf!important;outline-offset:2px!important}
 .edch-vkb-cap{overflow-wrap:anywhere;white-space:normal}
+.edch-vkb-action{display:block;width:100%;max-width:100%;font-size:.54rem;font-weight:500;
+ line-height:1.1;color:#c1e8e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.edch-vkb-key.planned .edch-vkb-action{color:#ffe0b3}
 .edch-vkb-count{position:absolute;right:2px;top:2px;font-size:.55rem;color:#fff;background:#426278;
  border-radius:8px;min-width:13px;padding:1px 2px}
 .edch-vkb-dot{position:absolute;bottom:0;right:3px;font-size:14px;line-height:1;color:#ffe2b7}
