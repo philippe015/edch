@@ -340,8 +340,12 @@ export interface ControlsPresetResult { preset: string; filename: string; path: 
 export const controlsSavePreset = (sourceFile: string, change: ControlsPresetChange): Promise<ControlsPresetResult> =>
   invoke<ControlsPresetResult>("controls_save_preset", { sourceFile, change });
 /** v1.6.6: checked multi-change generation, never modifying the original file. */
-export const controlsSavePresetBatch = (sourceFile: string, changes: ControlsPresetChange[]): Promise<ControlsPresetResult> =>
-  invoke<ControlsPresetResult>("controls_save_preset_batch", { sourceFile, changes });
+export const controlsSavePresetBatch = (
+  sourceFile: string,changes: ControlsPresetChange[],requestedPresetName?:string,
+): Promise<ControlsPresetResult> =>
+  invoke<ControlsPresetResult>("controls_save_preset_batch", {
+    sourceFile, changes, requestedPresetName: requestedPresetName??null,
+  });
 /** v1.6.7: optional Linux joystick inspection. Raw indexes are NOT game .binds IDs. */
 export interface HotasDevice { id: string; name: string; vendor?: string | null; product?: string | null; readable: boolean; }
 export interface HotasEvent { deviceId: string; kind: "button" | "axis"; inputIndex: number; value: number; }
