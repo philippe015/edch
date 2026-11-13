@@ -130,7 +130,7 @@ test("AZERTY + mouse shares foot tab without changing other device tabs or file 
   assert.ok(editor.includes("recommendFootMouse(src.actions,src.binds,meta)"));
   assert.ok(editor.includes('this.repaint("mouse")'));
   assert.ok(editor.includes("Clavier AZERTY + souris"));
-  assert.ok(editor.includes("controlsSavePresetBatch"));
+  assert.ok(editor.includes("controlsSaveNamedPresetBatch"));
   assert.ok(css.includes(".edch-mouse-btn.selected"));
   assert.ok(html.includes("foot-mouse-v1616.css"));
   assert.doesNotMatch(view,/controlsSavePresetBatch|writeFile|fetch\(/);
