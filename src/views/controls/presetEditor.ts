@@ -23,6 +23,7 @@ import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, t
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { captureKeyboardForFoot, captureMouseForFoot, captureVirtualFootKey, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
+import {planCompleteFoot,missingFootMovement,suggestedPresetName} from "../../features/controls/footCompleteProfiles.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
 
 interface SourceState { filename: string; preset: string; actions: string[]; binds: Bind[]; keyboardLayout: string }
@@ -59,6 +60,8 @@ export class ControlsPresetEditor {
   private inGameGuideMessage="";
   private inGameGuideBusy=false;
   private profile:SuggestedProfile="balanced";
+  private isPreparedNamed=false;
+  private requestedPresetName="";
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
   private editInput="";
@@ -76,13 +79,13 @@ export class ControlsPresetEditor {
     this.context={meta,files,active,reload};
     if(this.mode!==scope){
       this.mode=scope;this.staged=[];this.acknowledgeWarnings=false;
-      this.editAction="";this.message="";this.section="all";this.captureMode=false;
+      this.editAction="";this.message="";this.section="all";this.captureMode=false;this.isPreparedNamed=false;this.requestedPresetName="";
       this.selected=active;this.source=undefined;this.attempted="";this.editInput="";this.inGameStatus=null;
     }
     const names=files.filter(f=>f.folder==="Bindings" && f.name.toLowerCase().endsWith(".binds") && f.size<=5_000_000)
       .map(f=>f.name).sort((a,b)=>a.localeCompare(b,"fr"));
     if (!names.includes(this.selected)) {
-      this.selected=names.includes(active)?active:names[0]??"";
+      this.selected=names.includes(active)?active:names[0]??"";this.isPreparedNamed=false;this.requestedPresetName="";
       this.source=undefined;this.attempted="";this.staged=[];this.editAction="";this.inGameStatus=null;this.captureMode=false;
     }
     if (this.selected && this.source?.filename!==this.selected && this.attempted!==this.selected && !this.loading) void this.loadSource(this.selected);
@@ -106,7 +109,14 @@ export class ControlsPresetEditor {
     if (!inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=inputs.length?bindingKey(inputs[0]):"";
     const editsWarnings=src?[...new Set([...occupancyWarnings(src.binds,this.staged,meta),
       ...scopedInputWarnings(src.binds,this.staged,meta)])]:[];
-    const canSave=Boolean(src && this.staged.length && this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
+    const preparedFoot=this.mode==="foot"&&this.family==="azerty"&&this.isPreparedNamed;
+    const proposedPresetName=this.requestedPresetName||
+      suggestedPresetName(this.mode,this.family,this.profile,this.isPreparedNamed);
+    const goodPresetName=/^EDCH_[A-Za-z0-9_]{1,35}$/.test(proposedPresetName)&&proposedPresetName.length<=40;
+    const incompleteMovement=preparedFoot&&src?missingFootMovement(src.binds,this.staged):[];
+    const canSave=Boolean(src && (this.staged.length || preparedFoot) && goodPresetName &&
+      incompleteMovement.length===0 && this.staged.length<=64 &&
+      this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
       && (!editsWarnings.length || this.acknowledgeWarnings) && isTauri() && !isRemote() && !this.loading && !this.saving);
     const selectedAction=src?.actions.includes(this.editAction)?this.editAction:"";
     const old=src?.binds.find(b=>b.action===selectedAction&&b.slot===this.editSlot);
@@ -115,10 +125,10 @@ export class ControlsPresetEditor {
     const btn=(text:string,fn:()=>void,disabled=false,style="")=>h(`button.edch-c166-btn${style?"."+style:""}`,{type:"button",disabled,onclick:fn},text);
     const sourceSelect=h("label.edch-c166-source",null,"Profil Elite Dangerous",h("select",{value:this.selected,disabled:this.loading||this.saving,
       onchange:(e:Event)=>{this.generation++;this.selected=(e.target as HTMLSelectElement).value;this.source=undefined;
-        this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.captureMode=false;this.repaint();},
+        this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.captureMode=false;this.isPreparedNamed=false;this.requestedPresetName="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · clavier visible pendant la capture v1.6.20"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils nommés et AZERTY complet v1.6.21"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -127,7 +137,7 @@ export class ControlsPresetEditor {
         onclick:()=>{
           if(this.family===x.id)return;
           if(this.staged.length&&!window.confirm("Changer de périphérique et abandonner le brouillon non enregistré ?"))return;
-          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";this.captureMode=false;
+          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";this.captureMode=false;this.isPreparedNamed=false;this.requestedPresetName="";
           this.repaint();
         }},x.id==="azerty"&&this.mode==="foot"?"Clavier AZERTY + souris":x.label)));
     const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
@@ -269,7 +279,8 @@ export class ControlsPresetEditor {
         ...USAGE_STYLES.map(style=>{
           const template=PREPARED_TEMPLATES.find(t=>t.scope===this.mode&&t.usage===style.id)!;
           const prepared=src&&this.family==="azerty"
-            ?prepareAzerty(this.mode,style.id,src.actions,src.binds,meta):undefined;
+            ?this.mode==="foot"?planCompleteFoot(style.id,src.actions,src.binds,meta)
+              :prepareAzerty(this.mode,style.id,src.actions,src.binds,meta):undefined;
           const intelligent=src&&this.family==="xbox"
             ?recommendXboxProfile(this.mode,style.id,src.actions,src.binds,meta):undefined;
           const inferred=src&&this.family==="hotas"
@@ -283,7 +294,9 @@ export class ControlsPresetEditor {
             +(footMouse?.skipped.length??0);
           const replacements=changes.filter(c=>c.replaceExisting).length;
           const detail=this.family==="azerty"
-            ?template.description+(this.mode==="foot"?" Tir et zoom souris ajoutés uniquement si les boutons sont reconnus.":"")
+            ?this.mode==="foot"
+              ?"Profil À pied AZERTY étendu : déplacements ZQSD, combat, outils, soins, armes, menus et raccourcis de navigation. Les axes et boutons non reconnus restent intacts."
+              :template.description
             :this.family==="xbox"
               ?XBOX_STYLES[style.id].description+" Analyse des boutons reconnus, sans écraser les axes."
               :"Utilise les boutons déjà présents dans le profil X52 Pro / HOTAS. Aucun bouton inventé.";
@@ -298,10 +311,12 @@ export class ControlsPresetEditor {
             h("button",{type:"button",disabled:!src||this.saving||this.loading,
               onclick:()=>{
                 this.profile=style.id;
+                this.isPreparedNamed=this.family==="azerty"&&this.mode==="foot";
+                this.requestedPresetName=suggestedPresetName(this.mode,this.family,style.id,this.isPreparedNamed);
                 if(changes.length)this.stageAdvice({changes});
                 else{
-                  this.message=this.family==="azerty"
-                    ?"Ce profil est déjà conforme ou les touches proposées sont occupées. Aucune modification appliquée."
+                  this.message=this.isPreparedNamed
+                    ?"Touches déjà conformes ou bloquées. Vérifie les déplacements ZQSD, les conflits et les commandes sans proposition avant création."
                     :"Aucun bouton vérifié ne peut être proposé pour ce périphérique. Configure-le d'abord dans Elite Dangerous.";
                   this.repaint();
                 }
@@ -309,7 +324,7 @@ export class ControlsPresetEditor {
         }),
       ),
       this.family==="azerty"
-        ?h("p.edch-c166-muted",null,"Profils suggérés (non officiels). À pied : souris 1 = tir, souris 2 = zoom, souris 3 = interaction secondaire seulement si ces boutons existent dans le .binds et sont libres. Vérifie le brouillon.")
+        ?h("p.edch-c166-muted",null,"À pied : le profil complet propose ZQSD, outils, armes, soins et menus. Les axes et boutons des autres périphériques sont conservés. Tout raccourci impossible à attribuer est signalé.")
         :h("p.edch-c166-muted",null,"X52 Pro/Xbox : les axes restent inchangés. Seules les affectations réellement reconnues dans le profil source peuvent être reprises."),
     );
     const adviceBox=h("section.edch-c166-pane",null,
