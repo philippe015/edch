@@ -250,7 +250,7 @@ fn named_preset_candidate(base: &str, attempt: usize) -> Result<String,String> {
         return Err("preset name must be an EDCH_ identifier of max 40 ASCII characters".into());
     }
     let suffix=if attempt==1 {String::new()} else {format!("_{attempt:02}")};
-    let prefix=base.get(..40usize.saturating_sub(suffix.len())).ok_or("invalid name")?;
+    let prefix=base.get(..base.len().min(40usize.saturating_sub(suffix.len()))).ok_or("invalid name")?;
     Ok(format!("{prefix}{suffix}"))
 }
 fn preset_name_present(dir: &Path, name: &str) -> Result<bool,String> {
