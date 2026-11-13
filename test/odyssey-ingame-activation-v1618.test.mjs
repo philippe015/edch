@@ -66,7 +66,7 @@ test("in-game assistant is scoped to On Foot and exposes functioning host action
     'optionsDir()',
     'readOptionFile("Bindings",start.name)',
     'fileForPreset(current',
-    'controlsSavePresetBatch',
+    'controlsSaveNamedPresetBatch',
     'this.lastCreated={preset:out.preset,filename:out.filename,path:out.path}',
   ])assert.ok(editor.includes(s),s);
   assert.ok(page.includes("odyssey-ingame-foot-v1618.css"));
