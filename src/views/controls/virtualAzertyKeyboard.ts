@@ -76,6 +76,8 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
     const current=state.existing.length>0;
     const names=[...state.existing,...state.prepared]
       .map(x=>localizedActionLabel(meta,x.action));
+    const firstAction=state.prepared[0]??state.existing[0];
+    const firstLabel=firstAction?localizedActionLabel(meta,firstAction.action):"";
     const tooltip=count
       ? `${label} : ${[...new Set(names)].join(", ")}`
       : `${label} : aucune commande assignée dans ce contexte`;
@@ -88,6 +90,7 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
       onclick:()=>onSelect(keys[0]),
     },
       h("span.edch-vkb-cap",null,label),
+      firstLabel?h("span.edch-vkb-action",{title:firstLabel},firstLabel):null,
       count?h("span.edch-vkb-count",null,String(count)):null,
       planned?h("span.edch-vkb-dot",{title:"Modification proposée"},"•"):null,
     );
