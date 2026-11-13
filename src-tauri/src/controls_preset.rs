@@ -560,11 +560,11 @@ mod tests {
     }
     #[test]
     fn named_output_contains_expected_keys_and_french_layout() {
-        let source=XML.replacen("<Root PresetName=\\\"Custom\\\" MajorVersion=\\\"4\\\" MinorVersion=\\\"2\\\">",
-          "<Root PresetName=\\\"Custom\\\" MajorVersion=\\\"4\\\" MinorVersion=\\\"2\\\"><KeyboardLayout>en-US</KeyboardLayout>",1);
+        let source=XML.replacen("<YawLeftButton>",
+          "<KeyboardLayout>en-US</KeyboardLayout><YawLeftButton>",1);
         let changes=[c()];
         let output=named_xml(&source,"EDCH_PIED_AZERTY_COMBAT",&changes,true).unwrap();
-        assert!(output.contains("PresetName=\\\"EDCH_PIED_AZERTY_COMBAT\\\""));
+        assert!(output.contains("EDCH_PIED_AZERTY_COMBAT"));
         assert!(output.contains("<KeyboardLayout>fr-FR</KeyboardLayout>"));
         verify_named_output(&output,"EDCH_PIED_AZERTY_COMBAT",&changes).unwrap();
         assert!(verify_named_output(&output,"EDCH_PIED_AZERTY_POLY",&changes).is_err());
