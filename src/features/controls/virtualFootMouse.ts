@@ -82,3 +82,59 @@ export function digitalMouseInputs(binds:readonly Bind[]):Bind[] {
     keys.add(signature);return true;
   });
 }
+
+/** Optional local suggestions for Odyssey on foot. Never fabricates a mouse code.
+ * Only unused digital Mouse_1/2/3 already found in the source .binds qualify.
+ * Existing axes, keyboard and mouse bindings are never replaced.
+ */
+export interface FootMouseAdvice {
+  changes:PresetAssignment[];
+  covered:number;
+  relevant:number;
+  skipped:string[];
+}
+export function recommendFootMouse(
+  actions:readonly string[],binds:readonly Bind[],meta:BindsMeta,
+):FootMouseAdvice {
+  const targets:readonly [string,string][]=[
+    ["HumanoidPrimaryFireButton","Mouse_1"],
+    ["HumanoidZoomButton","Mouse_2"],
+    ["HumanoidSecondaryInteractButton","Mouse_3"],
+  ];
+  const allowed=new Set(actions);
+  const sourceInputs=digitalMouseInputs(binds);
+  const changes:PresetAssignment[]=[];
+  const skipped:string[]=[];
+  let covered=0,relevant=0;
+  for(const [action,key] of targets){
+    if(!allowed.has(action)||scopeForGroup(groupOf(meta,action))!=="foot"){
+      skipped.push(action+" : action non disponible dans ce .binds");continue;
+    }
+    relevant++;
+    if(binds.some(b=>b.action===action&&b.device==="Mouse"&&
+      b.slot!=="axis"&&b.key===key&&b.modifiers.length===0)){
+      covered++;continue;
+    }
+    if(binds.some(b=>b.action===action&&b.device==="Mouse"&&b.slot!=="axis")){
+      skipped.push(action+" : une autre touche souris est déjà attribuée");continue;
+    }
+    if(!sourceInputs.some(b=>b.key===key)){
+      skipped.push(key+" : bouton absent du fichier .binds");continue;
+    }
+    const occupied=binds.filter(b=>b.action===action&&b.slot!=="axis");
+    const slot:"primary"|"secondary"|null =
+      !occupied.some(b=>b.slot==="primary")?"primary":
+      !occupied.some(b=>b.slot==="secondary")?"secondary":null;
+    if(!slot){skipped.push(action+" : emplacements occupés");continue;}
+    if(binds.some(b=>b.slot!=="axis"&&b.action!==action&&
+      scopeForGroup(groupOf(meta,b.action))==="foot"&&b.device==="Mouse"&&
+      b.key===key&&b.modifiers.length===0)){
+      skipped.push(key+" : déjà utilisé à pied");continue;
+    }
+    if(changes.some(c=>c.key===key)){
+      skipped.push(key+" : doublon dans la proposition");continue;
+    }
+    changes.push({action,slot,device:"Mouse",key,modifiers:[],replaceExisting:false});
+  }
+  return {changes,covered,relevant,skipped};
+}
