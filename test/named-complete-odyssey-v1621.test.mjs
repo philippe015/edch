@@ -68,7 +68,7 @@ test("WASD screenshot becomes ZQSD in an explicit complete on-foot draft",()=>{
     assert.ok(plan.changes.some(c=>c.action==="HumanoidStrafeLeftButton"&&c.key==="Key_Q"),usage);
     assert.ok(!plan.changes.some(c=>c.action==="HumanoidPrimaryFireButton"));
     assert.ok(!plan.changes.some(c=>c.action==="HumanoidZoomButton"));
-    assert.equal(plan.allActions,79);
+    assert.equal(plan.allActions,actions.filter(a=>meta.controls[a]?.g==="OnFoot").length);
     assert.ok(plan.preservedAxes===0);
     assert.ok(plan.changes.every(c=>isStagedAssignmentValid(c,actions,source)),usage);
     assert.ok(plan.changes.every(c=>c.slot!=="axis"&&
@@ -82,7 +82,7 @@ test("on-foot axes and HOTAS remain untouched; conflicts are visible rather than
   const source=[
     b("HumanoidForwardAxis","Joy_YAxis","SaitekX52Pro","axis"),
     b("HumanoidForwardButton","Key_W"),
-    b("HumanoidPrimaryInteractButton","Key_Z"),
+    b("HumanoidConflictContextualUI","Key_Z"),
     b("HumanoidPrimaryFireButton","Mouse_1","Mouse"),
     b("HumanoidReloadButton","Key_E"),
   ];
@@ -112,7 +112,7 @@ test("frontend uses named preset writer and shows errors, missing actions and ex
   const html=read("public/index.html");
   for(const s of ["controlsSaveNamedPresetBatch","prepareCompleteFootAzerty",
     "namedPreset(this.mode,this.family,this.profile)","matchedPresetFiles",
-    "Mettre à jour ce préréglage","Sauvegarder automatiquement",
+    "Mettre à jour le préréglage nommé","Sauvegarder automatiquement",
     "Afficher les commandes encore sans touche","Nom du préréglage dans le jeu"])
     assert.ok(editor.includes(s),s);
   assert.ok(lib.includes("controls_save_named_preset_batch"));
