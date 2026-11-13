@@ -23,7 +23,10 @@ export function missionTitle(symbol: string): string {
   );
 }
 
-/** One kill against `victimFaction`: counts for the oldest unfinished mission of each issuer. */
+/** A kill against victimFaction counts toward the oldest unfinished mission per issuer.
+ * Both bounties and combat bonds can advance massacre missions in conflict zones.
+ * Source: BKNadir/edch commit 060a7d0 (v0.10.12), adapted to Cyberpunk Philou.
+ */
 function massacreKill(st: ActivityState, victimFaction: string) {
   const byIssuer = new Map<string, Mission>();
   const candidates = Object.values(st.missions)
@@ -155,6 +158,9 @@ export const MISSIONS_EVENTS: EventHandlers = {
     const session = st.session;
     session.kills += 1;
     session.bonds += num(ev.Reward) ?? 0;
+    // A conflict massacre mission counts kills in its conflict zone.
+    const victim = ev.VictimFaction_Localised ?? ev.VictimFaction;
+    if (victim) massacreKill(st, String(victim));
     return true;
   },
   RedeemVoucher: (st, ev) => {

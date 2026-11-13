@@ -70,5 +70,5 @@ test("templates: VKB Gladiator picture and pad box matching", async () => {
   assert.equal(deviceInfo(meta, "231D0200").label, "VKB Gladiator NXT Premium Right");
   const pad = meta.templates["GamePad"];
   assert.ok(templateBox(pad, "GamePad", "GamePad_FaceDown"), "GamePad_* names find the Pad_* boxes");
-  assert.ok(meta.templateBase.startsWith("https://raw.githubusercontent.com/richardbuckle/EDRefCard/"));
+  assert.ok(meta.templateBase.startsWith("https://raw.githubusercontent.com/brammmers/edrefcard2/"));
 });
