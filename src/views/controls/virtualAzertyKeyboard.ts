@@ -6,6 +6,7 @@ import type { Bind, BindsMeta } from "../../features/controls/binds.js";
 import type { PresetAssignment } from "../../features/controls/presetAdvisor.js";
 import type { GameScope } from "../../features/controls/scopedProfiles.js";
 import { assignmentsForVirtualKey, keyIds, virtualKeyCount } from "../../features/controls/virtualAzerty.js";
+import { approvedCapturedKeyboardKey } from "../../features/controls/footDirectCapture.js";
 import { localizedActionLabel, localizedKeyLabel } from "../../features/controls/actionLabels.js";
 import { KEY_IDS, KEY_CAPS, type Id } from "./keyLayouts.js";
 import { h } from "../../ui/dom.js";
@@ -63,12 +64,15 @@ export interface VirtualKeyboardOptions {
   selectedKey:string;
   sourceLoaded:boolean;
   onSelect:(key:string)=>void;
+  captureMode?:boolean;
 }
 export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElement {
-  const {meta,scope,original,draft,selectedKey,sourceLoaded,onSelect}=options;
+  const {meta,scope,original,draft,selectedKey,sourceLoaded,onSelect,captureMode=false}=options;
   const summary=(key:Id)=>assignmentsForVirtualKey(key,scope,original,draft,meta);
   const button=(id:Id,label:string,w=1):HTMLElement=>{
     const keys=keyIds(id);
+    const capturableKey=keys.find(k=>approvedCapturedKeyboardKey("Keyboard",k,[]));
+    const disabled=captureMode&&!capturableKey;
     const state=summary(id);
     const count=virtualKeyCount(state);
     const selected=keys.includes(selectedKey);
@@ -78,16 +82,19 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
       .map(x=>localizedActionLabel(meta,x.action));
     const firstAction=state.prepared[0]??state.existing[0];
     const firstLabel=firstAction?localizedActionLabel(meta,firstAction.action):"";
-    const tooltip=count
-      ? `${label} : ${[...new Set(names)].join(", ")}`
-      : `${label} : aucune commande assignée dans ce contexte`;
+    const tooltip=disabled
+      ? label+" : touche non disponible pour la capture directe"
+      : count? `${label} : ${[...new Set(names)].join(", ")}`
+        : `${label} : aucune commande assignée dans ce contexte`;
     const cls=["edch-vkb-key",current?"assigned":"",planned?"planned":"",selected?"selected":""].filter(Boolean).join(" ");
     return h("button",{
-      class:cls,type:"button",style:{flexGrow:String(w),flexBasis:`${w*45}px`},
+      class:cls,type:"button",disabled,style:{flexGrow:String(w),flexBasis:`${w*45}px`},
       title:tooltip, "aria-pressed":selected,
-      "aria-label":`${label} : ${count} affectation(s). Cliquer pour voir les commandes.`,
-      "data-key":keys[0],
-      onclick:()=>onSelect(keys[0]),
+      "aria-label":captureMode
+        ? label+(disabled?" : non capturable":" : choisir cette touche pour l'attribution")
+        : `${label} : ${count} affectation(s). Cliquer pour voir les commandes.`,
+      "data-key":captureMode?capturableKey??keys[0]:keys[0],
+      onclick:()=>{if(!disabled)onSelect(captureMode?capturableKey!:keys[0]);},
     },
       h("span.edch-vkb-cap",null,label),
       firstLabel?h("span.edch-vkb-action",{title:firstLabel},firstLabel):null,
@@ -97,7 +104,7 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
   };
   const row=(keys:readonly [Id,string,number?][])=>h("div.edch-vkb-row",null,
     ...keys.map(([id,label,w])=>button(id,label,w??1)));
-  const keyPanel=selectedKey
+  const keyPanel=!captureMode&&selectedKey
     ?(()=>{
       const state=summary(selectedKey);
       const label=localizedKeyLabel(meta,selectedKey);
@@ -119,13 +126,15 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
           h("p",null,"Aucune commande affectée à cette touche dans le contexte sélectionné."),
       );
     })()
-    :h("p.edch-vkb-hint",null,"Clique sur une touche pour afficher les commandes qui lui sont associées.");
+    :captureMode?null:h("p.edch-vkb-hint",null,"Clique sur une touche pour afficher les commandes qui lui sont associées.");
 
   return h("section.edch-vkb-panel",{role:"region","aria-label":"Clavier virtuel AZERTY des commandes Elite Dangerous"},
     h("div.edch-vkb-header",null,
       h("div",null,
-        h("h4",null,"Clavier virtuel AZERTY · disposition française"),
-        h("p",null,"Touches visibles et cliquables. Les affectations sont lues dans le profil sélectionné et les propositions du brouillon.")),
+        h("h4",null,captureMode?"Choisir une touche sur le clavier AZERTY":"Clavier virtuel AZERTY · disposition française"),
+        h("p",null,captureMode
+          ?"Clique sur une touche du clavier affiché ou appuie sur la touche de ton clavier physique. Les touches grisées ne sont pas prises en charge par la capture directe."
+          :"Touches visibles et cliquables. Les affectations sont lues dans le profil sélectionné et les propositions du brouillon.")),
       h("div.edch-vkb-legend",null,
         h("span.edch-vkb-legend-item",null,h("i",{class:"edch-vkb-swatch assigned"}),"Attribuée"),
         h("span.edch-vkb-legend-item",null,h("i",{class:"edch-vkb-swatch planned"}),"Proposée"),
@@ -144,7 +153,8 @@ export function virtualAzertyKeyboard(options:VirtualKeyboardOptions):HTMLElemen
       ),
     ),
     keyPanel,
-    h("p.edch-vkb-footnote",null,
-      "Lecture seule : cliquer ne simule pas l'appui dans Elite Dangerous et ne modifie pas les commandes. Les touches sont celles d'un clavier AZERTY ISO ; vérifie la disposition déclarée dans le fichier .binds."),
+    h("p.edch-vkb-footnote",null,captureMode
+      ?"Le clic sur le clavier choisit une touche pour le brouillon, sans envoyer de frappe au jeu. Le fichier .binds d'origine reste intact."
+      :"Lecture seule : cliquer ne simule pas l'appui dans Elite Dangerous et ne modifie pas les commandes. Les touches sont celles d'un clavier AZERTY ISO ; vérifie la disposition déclarée dans le fichier .binds."),
   );
 }
