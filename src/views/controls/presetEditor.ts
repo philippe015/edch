@@ -360,7 +360,52 @@ export class ControlsPresetEditor {
           h("p.edch-c166-muted",null,
             "Uniquement les boutons présents dans le fichier source. Aucun axe ni touche existante remplacé.")):null,
       h("p.edch-c166-muted",null,"Le brouillon ne modifie aucun fichier. Les touches occupées et les axes analogiques sont préservés."));
+    const completeFootPreview=src&&this.mode==="foot"&&this.family==="azerty"
+      ?planCompleteFoot(this.profile,src.actions,src.binds,meta):undefined;
+    const fullKeyInventory=completeFootPreview&&src
+      ?h("details.edch-c1621-complete",null,
+        h("summary",null,
+          "Toutes les propositions À pied · "+completeFootPreview.expected.length+
+          " touches prévues, "+completeFootPreview.totalDigital+" commandes numériques inspectées"),
+        h("p.edch-c166-muted",null,
+          "Le profil AZERTY affiche chaque action connue et précise si sa touche peut être proposée. Les axes restent inchangés."),
+        h("div.edch-c1621-entries",null,
+          ...completeFootPreview.expected.map(rule=>{
+            const planned=this.staged.find(c=>c.action===rule.action);
+            const current=src.binds.filter(b=>b.action===rule.action&&b.slot!=="axis");
+            const skipped=completeFootPreview.skipped.find(x=>x.action===rule.action);
+            const status=planned?"Brouillon : "+planned.key:skipped?"Non appliqué : "+skipped.reason:
+              current.some(b=>b.device==="Keyboard"&&b.key===rule.key)?
+                "Déjà conforme":"Prête à être proposée par le profil complet";
+            return h("div.edch-c1621-entry",null,
+              h("strong",null,localizedActionLabel(meta,rule.action)),
+              h("span",null,"Proposé : "+rule.key),
+              h("small",null,"Profil source : "+(current.map(readKey).join(" / ")||"Non attribué")),
+              h("small",{class:skipped?"edch-c1621-skipped":""},status),
+            );
+          }),
+        ),
+        completeFootPreview.unassigned.length?h("details.edch-c1621-unassigned",null,
+          h("summary",null,completeFootPreview.unassigned.length+
+            " autres commandes sans attribution ni proposition sûre"),
+          ...completeFootPreview.unassigned.map(action=>
+            h("p.edch-c166-muted",null,localizedActionLabel(meta,action)))):null,
+      ):null;
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
+      h("label.edch-c166-field",null,"Nom du préréglage visible dans Odyssey",
+        h("input.edch-c1621-name",{
+          type:"text",maxLength:40,value:proposedPresetName,
+          spellcheck:false,autocomplete:"off",
+          oninput:(e:Event)=>{this.requestedPresetName=(e.target as HTMLInputElement).value;},
+        })),
+      h("p.edch-c166-muted",null,
+        "Ce nom est inscrit dans le fichier .binds ET dans PresetName. Les anciens EDCHPRO001–004 sont conservés, sans être dupliqués."),
+      !goodPresetName?h("p.edch-c166-warning",null,
+        "Nom invalide : commence par EDCH_, sans espaces ni accents, maximum 40 caractères."):null,
+      incompleteMovement.length?h("p.edch-c166-warning",null,
+        "ZQSD incomplet : "+incompleteMovement.map(r=>localizedActionLabel(meta,r.action)+" → "+r.key).join(" ; ")+
+        ". Corrige les conflits avant de créer un profil complet."):null,
+      fullKeyInventory,
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
         h("span",null,h("strong",null,localizedActionLabel(meta,change.action)),
           h("small",null,change.replaceExisting
@@ -377,7 +422,7 @@ export class ControlsPresetEditor {
         btn(this.saving?"Création du profil…":"Créer un nouveau profil pour Elite Dangerous",()=>{void this.save();},!canSave,"primary"),
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
-      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer le profil ; sélectionne ensuite EDCHPro dans les préréglages du jeu (Général, Vaisseau, VRS et À pied selon la catégorie)."));
+      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme le jeu et son lanceur, crée le profil, puis sélectionne son NOM EXACT dans Options → Commandes → À pied. Le profil source n’est jamais écrasé."));
     const hotas = this.family==="hotas" && this.mode==="ship" ? this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
       const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
       if (!input) return;
