@@ -1,0 +1,36 @@
+name: EDCH Cyberpunk Philou — Clavier AZERTY v1.6.13
+on:
+  push:
+    branches:
+      - 'feat/commandes-clavier-azerty-virtuel-v1.6.13-*'
+  pull_request:
+    paths:
+      - 'src/features/controls/virtualAzerty.ts'
+      - 'src/views/controls/virtualAzertyKeyboard.ts'
+      - 'src/views/controls/presetEditor.ts'
+      - 'public/virtual-azerty-v1613.css'
+      - 'public/index.html'
+      - 'test/virtual-azerty-v1613.test.mjs'
+      - '.github/workflows/edch-virtual-azerty-v1613.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edch-azerty-v1613-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-regressions:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-package-lock --no-audit --no-fund
+      - name: Compile TypeScript frontend
+        run: npm run build
+      - name: Run all JavaScript tests
+        run: node --test test/*.test.mjs
