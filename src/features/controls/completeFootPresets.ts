@@ -76,10 +76,8 @@ export const FULL_FOOT_AZERTY_RULES:readonly FootRule[]=[
   E("HumanoidPitchDownButton","Key_Delete","advanced"),
   E("HumanoidRotateLeftButton","Key_Home","advanced"),
   E("HumanoidRotateRightButton","Key_End","advanced"),
-  E("HumanoidSelectNextGrenadeTypeButton","Key_F12","advanced"),
 ];
-/** Remove duplicate entries in the static source while preserving the first choice. */
-const rules=[...new Map(FULL_FOOT_AZERTY_RULES.map(r=>[r.action,r])).values()];
+const rules=FULL_FOOT_AZERTY_RULES;
 export interface FullFootSkip {action:string;key:string;reason:string}
 export interface FullFootPlan {
   usage:Usage;
