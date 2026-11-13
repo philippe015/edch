@@ -138,7 +138,7 @@ test("Xbox diagram is present for Xbox tab and retains the original confirmation
     "data-xbox-control","xboxControllerDiagram","role:\"region\"","Lecture seule"])
     assert.ok(view.includes(v),v);
   for(const v of ["xboxControllerDiagram({","xboxDiagram,",
-    "recommendXboxProfile","stageAdvice","controlsSavePresetBatch","window.confirm("])
+    "recommendXboxProfile","stageAdvice","controlsSaveNamedPresetBatch","window.confirm("])
     assert.ok(editor.includes(v),v);
   assert.ok(css.includes(".edch-xbox-control.selected"));
   assert.ok(css.includes(":focus-visible"));
