@@ -222,6 +222,11 @@ export class ControlsPresetEditor {
         ?h("details.edch-xbox-plan-skips",null,h("summary",null,
           `${xboxAdvice.skipped.length} action(s) ignorée(s) ou bloquée(s)`),
           ...xboxAdvice.skipped.slice(0,20).map(x=>h("p.edch-c166-muted",null,x))):null,
+      this.family==="xbox"&&xboxAdvice?.suggestions.length
+        ?h("details.edch-xbox-plan-reasons",null,h("summary",null,
+          `${xboxAdvice.suggestions.length} suggestion(s) expliquée(s)`),
+          ...xboxAdvice.suggestions.map(item=>h("p.edch-c166-muted",null,
+            `${localizedActionLabel(meta,item.assignment.action)} → ${item.assignment.device} / ${item.assignment.key} : ${item.reason}`))):null,
       ...(this.family==="xbox"?xboxAdvice?.warnings??[]:deviceAdvice?.warnings??[])
         .map(w=>h("p.edch-c166-muted",null,w)),
       btn("Préparer les suggestions",()=>this.stageAdvice(this.family==="xbox"?xboxAdvice:deviceAdvice),
