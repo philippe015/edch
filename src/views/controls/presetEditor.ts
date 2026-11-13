@@ -18,6 +18,7 @@ import { HotasStudio } from "./hotasStudio.js"; // EDCH-HOTAS-STUDIO-v1.6.7
 import { X52ModesPanel } from "./x52ModesPanel.js"; // EDCH-X52-MODES-v1.6.8
 import { virtualAzertyKeyboard } from "./virtualAzertyKeyboard.js";
 import { virtualFootMouse } from "./virtualFootMouse.js";
+import {ENERGY_LINK_ACTION,ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
@@ -85,6 +86,8 @@ export class ControlsPresetEditor {
     ] : [];
     const footMousePlan=src&&this.mode==="foot"&&this.family==="azerty"
       ?recommendFootMouse(src.actions,src.binds,meta):undefined;
+    const energyLinkPlan=this.mode==="foot"&&src
+      ?planEnergyLink(src.actions,src.binds,meta):undefined;
     const deviceAdvice=src&&this.family!=="xbox"
       ?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
     const xboxAdvice=src&&this.family==="xbox"
@@ -107,7 +110,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · Clavier + Souris à pied v1.6.16"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · Energy Link v1.6.17"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -169,6 +172,46 @@ export class ControlsPresetEditor {
       ):h("p.edch-c166-muted",null,"Choisis P (principale) ou S (secondaire) à droite d'une commande."));
     // Ready-made profiles: keyboard templates use curated printed AZERTY keys.
     // HOTAS/Xbox recommendations only reuse buttons observed in the source .binds.
+    const energyLinkCard=this.mode==="foot"
+      ?h("section.edch-energylink",{role:"region","aria-label":"Recharger la combinaison à une borne Energy Link"},
+        h("div.edch-energylink-head",null,
+          h("h4",null,"Recharge de la combinaison · Energy Link"),
+          h("p",null,"Pour sortir l'outil de transfert d'énergie : touche 3 par défaut. Sur une borne de recharge alimentée, vise la prise verte et maintiens le tir principal pour recharger la combinaison."),
+        ),
+        h("div.edch-energylink-related",null,
+          ...ENERGY_LINK_RELATED.map(item=>{
+            const present=Boolean(src?.actions.includes(item.action));
+            const bound=src?.binds.filter(b=>b.action===item.action&&b.slot!=="axis")??[];
+            return h("div.edch-energylink-action",null,
+              h("div",null,
+                h("strong",null,item.label),
+                h("small",null,item.help),
+                h("span.edch-energylink-current",null,
+                  !src?"Profil .binds non chargé":!present?"Non déclaré dans ce profil":
+                    bound.length?bound.map(readKey).join(" · "):"Aucune touche attribuée"),
+              ),
+              btn("Voir / configurer",()=>{
+                if(!src||!present)return;
+                this.query=item.action;this.section="all";this.editAction=item.action;
+                const related=src.binds.filter(b=>b.action===item.action&&b.slot!=="axis");
+                this.editSlot=related.some(b=>b.slot==="primary")?
+                  related.some(b=>b.slot==="secondary")?"primary":"secondary":"primary";
+                this.replace=false;
+                this.message="Commande sélectionnée. Choisis une entrée existante ou prépare un raccourci puis valide le brouillon.";
+                this.repaint();
+              },!src||!present||this.loading||this.saving),
+            );
+          }),
+        ),
+        energyLinkPlan ?h("div.edch-energylink-recommend",null,
+          h("p.edch-c166-muted",null,energyLinkPlan.reason),
+          this.family==="azerty"&&energyLinkPlan.suggestion
+            ?btn("Préparer Energy Link sur la touche 3",()=>this.stageAdvice({changes:[energyLinkPlan.suggestion!]}),
+              this.loading||this.saving,"primary"):null,
+        ):null,
+        h("p.edch-c166-muted",null,
+          "Important : changer le mode de l'outil peut activer la surcharge. Utilise le mode transfert sur une borne de recharge ; une cellule d'énergie est une commande différente."),
+      ):null;
     const quickCards=h("section.edch-c1612-prepared",{role:"region","aria-label":"Profils préparés Elite Dangerous"},
       h("div.edch-c1612-prepared-head",null,
         h("h4",null,"Profils préparés · "+currentContext.label),
@@ -330,6 +373,7 @@ export class ControlsPresetEditor {
       src && this.family==="azerty" && !/^(fr|nl-BE)(-|$)/i.test(src.keyboardLayout)
         ? h("p.edch-c166-warning",null,"Le jeu indique le clavier "+src.keyboardLayout+". Vérifie AZERTY avant de valider.") : null,
       !names.length?h("p.edch-c166-warning",null,"Aucun profil .binds personnel : modifie puis enregistre une touche dans Elite Dangerous pour créer Custom."):null,
+      energyLinkCard,
       quickCards,
       azertyKeyboard,
       footMouse,
