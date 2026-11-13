@@ -85,6 +85,8 @@ test("virtual keyboard editor is visible only for AZERTY; no game or file writes
   assert.ok(editor.includes("azertyKeyboard,"));
   assert.ok(editor.includes('this.repaint("keyboard")'));
   assert.ok(css.includes(".edch-vkb-key.selected"));
+  assert.ok(css.includes(".edch-vkb-action"));
+  assert.ok(view.includes("firstLabel?h(\"span.edch-vkb-action\""));
   assert.ok(css.includes("@media(max-width:900px)"));
   assert.ok(index.includes('virtual-azerty-v1613.css'));
   assert.doesNotMatch(view,/controlsSavePresetBatch|writeBgs|fetch\(|\.binds.*write/);
