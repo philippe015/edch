@@ -1,0 +1,21 @@
+/* EDCH Cyberpunk Philou v1.6.18 — activate and configure Odyssey foot controls in-game. */
+.edch-ingame-foot{margin:12px 16px 18px;padding:16px;border:1px solid #7d90a2;border-radius:9px;
+ background:linear-gradient(125deg,#152331,#21303e);color:#edf3f9}
+.edch-ingame-foot-header h4{margin:0 0 8px;color:#ffc58b;font-size:1.07rem}
+.edch-ingame-foot-header p{margin:0 0 12px;max-width:850px;font-size:.84rem}
+.edch-ingame-foot-summary{border-left:3px solid #ddb17e;padding:10px 12px;background:#1b3241;
+ margin-bottom:12px;border-radius:0 6px 6px 0}
+.edch-ingame-foot-summary strong{color:#bde0d5}
+.edch-ingame-foot-summary p{margin:6px 0 0}
+.edch-ingame-foot-steps{counter-reset:step;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:7px 14px;padding:0;margin:12px 0 14px;list-style:none}
+.edch-ingame-foot-steps li{display:flex;gap:9px;align-items:flex-start;
+ border:1px solid #425a6a;background:#142532;border-radius:6px;padding:9px 10px;font-size:.83rem}
+.edch-ingame-foot-step{display:grid;place-items:center;background:#58452e;color:#ffdfb6;
+ border-radius:50%;flex:0 0 24px;height:24px;font-weight:750}
+.edch-ingame-foot-buttons{display:flex;flex-wrap:wrap;gap:9px}
+.edch-ingame-foot-buttons .edch-c166-btn{flex-shrink:0}
+.edch-ingame-foot-message{border-left:2px solid #6ea39a;background:#22373f;padding:9px;
+ color:#d2f5e5;font-size:.8rem;margin:11px 0}
+@media(max-width:820px){.edch-ingame-foot-steps{grid-template-columns:1fr}
+ .edch-ingame-foot{margin:8px 0 12px;padding:12px}}
