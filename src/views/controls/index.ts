@@ -3,6 +3,8 @@
 
 import {
   actionName,
+  englishActionName,
+  setActionLanguage,
   type Bind,
   type BindsMeta,
   comboLabel,
@@ -29,7 +31,7 @@ import {
   readOptionFile,
   revealPath,
 } from "../../platform/bridge.js";
-import { fold, gameText, t } from "../../platform/i18n.js";
+import { fold, gameText, lang, LANGS, t } from "../../platform/i18n.js";
 import type { Ctx, View } from "../../state/context.js";
 import { dialog } from "../../ui/dialog.js";
 import { h, icon, replace, toast } from "../../ui/dom.js";
@@ -57,6 +59,31 @@ const loadMeta = () =>
     if (!r.ok) throw new Error(`binds.json: HTTP ${r.status}`);
     return r.json();
   }));
+
+/** Local preference for command names; independent of EDCH's interface language. */
+const ACTION_LANGUAGE_KEY = "edch.controls.language";
+
+function preferredActionLanguage(): "en" | "fr" {
+  try {
+    const saved = localStorage.getItem(ACTION_LANGUAGE_KEY);
+    if (saved === "en" || saved === "fr") return saved;
+  } catch {
+    // The interface language remains a safe default if local storage is unavailable.
+  }
+  return lang().code === "fr" ? "fr" : "en";
+}
+
+let frenchNamesPromise: Promise<Record<string, string>> | undefined;
+
+/** Loads the optional local dictionary; no network host or additional dependency. */
+function loadFrenchNames(): Promise<Record<string, string>> {
+  return (frenchNamesPromise ??= fetch("data/binds.fr.json")
+    .then((response) => {
+      if (!response.ok) throw new Error("French controls labels unavailable");
+      return response.json() as Promise<Record<string, string>>;
+    })
+    .catch(() => ({})));
+}
 
 export class ControlsView implements View {
   private meta?: BindsMeta;
@@ -86,6 +113,7 @@ export class ControlsView implements View {
       return {};
     }
   })();
+  private actionLanguage: "en" | "fr" = preferredActionLanguage();
   private mode = "all";
   private query = "";
   private body = h("div.controls-body");
@@ -105,6 +133,7 @@ export class ControlsView implements View {
     try {
       const meta = await loadMeta();
       this.meta = meta;
+      await this.applyActionLanguage();
       await this.load();
       this.stopWatching ??= watchPresses(
         meta,
@@ -118,6 +147,24 @@ export class ControlsView implements View {
 
   update() {
     /* bindings only change on import or reload */
+  }
+
+  /** Apply the chosen display language without changing .binds files. */
+  private async applyActionLanguage(): Promise<void> {
+    const requested = this.actionLanguage;
+    const names = requested === "fr" ? await loadFrenchNames() : {};
+    if (requested === this.actionLanguage) setActionLanguage(requested, names);
+  }
+
+  private changeActionLanguage(value: string): void {
+    if (value !== "fr" && value !== "en") return;
+    this.actionLanguage = value;
+    try {
+      localStorage.setItem(ACTION_LANGUAGE_KEY, value);
+    } catch {
+      // A session-only selection still works without local storage.
+    }
+    void this.applyActionLanguage().then(() => this.render());
   }
 
   // ---------------- loading ----------------
@@ -271,7 +318,7 @@ export class ControlsView implements View {
       if (!q) return true;
       const name = actionName(meta, b.action);
       const combo = comboLabel(meta, b);
-      return [name, gameText(name), combo, gameText(combo), b.action, GROUP_LABELS[g] ?? g].some((candidate) =>
+      return [name, englishActionName(meta, b.action), gameText(name), combo, gameText(combo), b.action, GROUP_LABELS[g] ?? g].some((candidate) =>
         fold(candidate).includes(q),
       );
     });
@@ -307,6 +354,18 @@ export class ControlsView implements View {
           h("span.sub", null, " " + t("controls.bindingsKeyboard", { count: this.binds.length, layout: this.layout })),
         ),
         fileSelect,
+        h(
+          "label.controls-language",
+          null,
+          h("span.sub", null, t("controls.actionNamesLanguage")),
+          h(
+            "select",
+            { onchange: (event: Event) => this.changeActionLanguage((event.target as HTMLSelectElement).value) },
+            LANGS.filter((language) => language.code === "fr" || language.code === "en").map((language) =>
+              h("option", { value: language.code, selected: this.actionLanguage === language.code }, language.label),
+            ),
+          ),
+        ),
         h(
           "div.segmented",
           null,

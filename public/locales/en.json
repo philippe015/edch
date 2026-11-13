@@ -261,6 +261,7 @@
     "gameLocationUnknown": "{{fallback}} (game location unknown)"
   },
   "controls": {
+    "actionNamesLanguage": "Command names",
     "activePreset": "Active preset",
     "all": "All",
     "axes": "Axes",

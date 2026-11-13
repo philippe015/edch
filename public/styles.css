@@ -1799,6 +1799,14 @@ label.file-btn:hover {
 .controls-bar .search {
   width: 200px;
 }
+.controls-language {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.controls-language select {
+  min-width: 100px;
+}
 .device-tabs {
   display: flex;
   flex-wrap: wrap;

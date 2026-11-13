@@ -261,6 +261,7 @@
     "gameLocationUnknown": "{{fallback}} (posição no jogo desconhecida)"
   },
   "controls": {
+    "actionNamesLanguage": "Nomes dos comandos",
     "activePreset": "Predefinição ativa",
     "all": "Tudo",
     "axes": "Eixos",

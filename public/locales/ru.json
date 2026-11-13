@@ -261,6 +261,7 @@
     "gameLocationUnknown": "{{fallback}} (позиция в игре неизвестна)"
   },
   "controls": {
+    "actionNamesLanguage": "Названия команд",
     "activePreset": "Активный пресет",
     "all": "Всё",
     "axes": "Оси",

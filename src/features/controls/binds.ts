@@ -190,8 +190,23 @@ export function groupOf(meta: BindsMeta, action: string): string {
   );
 }
 
-export function actionName(meta: BindsMeta, action: string): string {
+/** Original EDRefCard name, used for a bilingual search and fallback. */
+export function englishActionName(meta: BindsMeta, action: string): string {
   return meta.controls[action]?.n ?? action.replace(/(?<=[a-z0-9])(?=[A-Z])/g, " ").replace(/_/g, " ");
+}
+
+let actionLanguage: "en" | "fr" = "en";
+let frenchActionNames: Readonly<Record<string, string>> = {};
+
+/** Changes display labels only: XML action identifiers and saved bindings remain unchanged. */
+export function setActionLanguage(language: "en" | "fr", frenchNames: Readonly<Record<string, string>> = {}): void {
+  actionLanguage = language;
+  frenchActionNames = frenchNames;
+}
+
+/** Localized controls label with an English fallback for unknown actions. */
+export function actionName(meta: BindsMeta, action: string): string {
+  return (actionLanguage === "fr" ? frenchActionNames[action] : undefined) ?? englishActionName(meta, action);
 }
 
 export function deviceInfo(meta: BindsMeta, id: string): { label: string; kind: DeviceKind } {
