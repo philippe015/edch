@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {
   FOOT_ESSENTIAL_RULES,FOOT_NAMED_PRESET,FOOT_MANUAL_PRESET,
-  suggestedPresetName,planCompleteFoot,missingFootMovement,
+  suggestedPresetName,planCompleteFoot,missingFootMovement,mergeFootKeyboardMouse,
 } from "../dist/js/features/controls/footCompleteProfiles.js";
 import {isStagedAssignmentValid} from "../dist/js/features/controls/presetAdvisor.js";
 import {approvedCapturedKeyboardKey} from "../dist/js/features/controls/footDirectCapture.js";
@@ -116,6 +116,23 @@ test("frontend passes names to native writer and blocks incomplete AZERTY ZQSD",
     "ZQSD incomplet","this.staged.length<=64","requestedPresetName"])
     assert.ok(editor.includes(str),str);
   assert.ok(bridge.includes("requestedPresetName: requestedPresetName??null"));
+});
+
+test("complete AZERTY and mouse suggestions never assign the same slot twice",()=>{
+  const source=[b("HumanoidPrimaryFireButton","Mouse_3","Mouse")];
+  const keys=planCompleteFoot("balanced",actions,source,meta).changes;
+  const mouse=[{action:"HumanoidSecondaryInteractButton",slot:"primary",device:"Mouse",
+    key:"Mouse_3",modifiers:[],replaceExisting:false}];
+  const merged=mergeFootKeyboardMouse(keys,mouse,source);
+  const interact=merged.filter(c=>c.action==="HumanoidSecondaryInteractButton");
+  assert.equal(interact.length,2);
+  assert.deepEqual(interact.map(c=>c.slot).sort(),["primary","secondary"]);
+  assert.ok(merged.length<=64);
+  assert.equal(new Set(merged.map(c=>c.action+"|"+c.slot)).size,merged.length);
+  const full=[b("HumanoidSecondaryInteractButton","Key_F","Keyboard","primary"),
+    b("HumanoidSecondaryInteractButton","Mouse_4","Mouse","secondary")];
+  const noExtra=mergeFootKeyboardMouse([],mouse,full);
+  assert.equal(noExtra.length,0);
 });
 
 test("native writer creates unique named .binds, checks generated slots, never overwrites",()=>{
