@@ -538,6 +538,17 @@ mod tests {
 </Root>"#;
     fn c() -> ControlsChange {ControlsChange{action:"YawLeftButton".into(),slot:"secondary".into(),device:"SaitekX52Pro".into(),key:"Joy_2".into(),modifiers:vec![],replace_existing:false}}
     #[test]
+    fn cleanup_accepts_only_legacy_numbered_edchpro_binds() {
+        assert_eq!(legacy_edch_filename("EDCHPro001.4.2.binds").as_deref(),Some("EDCHPRO001"));
+        assert_eq!(legacy_edch_filename("EDCHPRO0004.4.2.binds").as_deref(),Some("EDCHPRO0004"));
+        for file in ["EDCH_PIED_AZERTY_POLY.4.2.binds","Custom.4.2.binds",
+                     "SaitekX52Pro.4.2.binds","EDCHPro00.4.2.binds",
+                     "EDCHPro0001.3.0.binds","EDCHPro001.4.2.binds.bak",
+                     "../EDCHPro001.4.2.binds"] {
+           assert!(legacy_edch_filename(file).is_none(),"dangerous archive match: {file}");
+        }
+    }
+    #[test]
     fn stable_named_presets_reject_fake_or_unsafe_names() {
         for preset in ["EDCH_PIED_AZERTY_POLY","EDCH_PIED_AZERTY_COMBAT","EDCH_SRV_XBOX_NAV"] {
             assert!(safe_named_preset(preset), "expected safe name: {preset}");
