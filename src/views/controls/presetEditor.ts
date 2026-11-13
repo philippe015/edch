@@ -421,7 +421,7 @@ export class ControlsPresetEditor {
         btn(this.saving?"Enregistrement…":existingNamed?"Mettre à jour le préréglage nommé":"Créer le préréglage nommé",()=>{void this.save();},!canSave,"primary"),
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
-      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer ce profil nommé ; sélectionne ensuite son nom exact dans les préréglages du jeu pour le contexte concerné."));
+      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer ce profil nommé ; sélectionne ensuite son nom exact dans les préréglages du jeu : Vaisseau, VRS ou À pied selon le contexte."));
     const hotas = this.family==="hotas" && this.mode==="ship" ? this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
       const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
       if (!input) return;
