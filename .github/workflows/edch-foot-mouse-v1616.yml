@@ -1,0 +1,62 @@
+name: EDCH — Clavier AZERTY + souris à pied v1.6.16
+
+on:
+  push:
+    branches:
+      - 'feat/commandes-a-pied-clavier-souris-v1.6.16-*'
+  pull_request:
+    paths:
+      - 'src/features/controls/virtualFootMouse.ts'
+      - 'src/views/controls/virtualFootMouse.ts'
+      - 'src/views/controls/presetEditor.ts'
+      - 'public/foot-mouse-v1616.css'
+      - 'test/foot-azerty-mouse-v1616.test.mjs'
+      - '.github/workflows/edch-foot-mouse-v1616.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edch-foot-mouse-v1616-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-and-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install packages
+        run: npm install --no-package-lock --no-audit --no-fund
+      - name: Compile TypeScript
+        run: npm run build
+      - name: All JS regression tests
+        run: node --test test/*.test.mjs
+  native-profile-safety:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev \
+            libgtk-3-dev libsoup-3.0-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare frontend
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Validate native .binds writer
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: Check native compilation
+        run: cargo check --manifest-path src-tauri/Cargo.toml

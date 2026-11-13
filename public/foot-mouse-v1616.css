@@ -1,0 +1,49 @@
+/* EDCH Cyberpunk Philou v1.6.16 — graphical on-foot mouse alongside AZERTY. */
+.edch-foot-combo{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
+.edch-mouse-panel{margin:8px 16px 18px;padding:16px;background:linear-gradient(130deg,#111e2a,#182a34);
+ border:1px solid #5c7183;border-radius:10px;color:#e8f1f7}
+.edch-mouse-header h4{color:#ffc18c;font-size:1.04rem;margin:0 0 6px}
+.edch-mouse-header p{font-size:.82rem;color:#afc5d3;margin:0 0 12px}
+.edch-mouse-layout{display:grid;grid-template-columns:minmax(250px,340px) minmax(0,1fr);gap:18px;align-items:start}
+.edch-mouse-shape{position:relative;max-width:320px;min-height:320px;border-radius:49% 49% 40% 40%/38% 38% 42% 42%;
+ padding:26px 16px 25px;border:3px solid #648196;box-shadow:inset 0 8px 30px #233c4a,0 6px 14px #0004;
+ background:#243a48;display:grid;grid-template-rows:auto 1fr auto;gap:12px}
+.edch-mouse-top{display:grid;grid-template-columns:1fr .67fr 1fr;gap:5px;align-items:start}
+.edch-mouse-middle{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center}
+.edch-mouse-side,.edch-mouse-wheel{display:flex;flex-direction:column;gap:9px}
+.edch-mouse-axes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto}
+.edch-mouse-btn{position:relative;min-width:0!important;min-height:46px;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+ padding:6px 5px!important;border:1px solid #7893a7!important;border-radius:10px!important;
+ background:#1d2a36!important;color:#f1f5f8!important;cursor:pointer!important;
+ font-size:.75rem;line-height:1.15;text-align:center}
+.edch-mouse-btn strong{font-size:.8rem}
+.edch-mouse-btn.wheel{min-height:40px}
+.edch-mouse-btn.axis{border-style:dashed!important;font-size:.71rem}
+.edch-mouse-btn.assigned{background:#20515a!important;border-color:#85d5d1!important}
+.edch-mouse-btn.planned{background:#684927!important;border-color:#ffbd78!important}
+.edch-mouse-btn.selected{outline:3px solid #ffd6a5!important;outline-offset:2px}
+.edch-mouse-btn:hover{filter:brightness(1.2)}
+.edch-mouse-btn:focus-visible{outline:3px solid #ffe0bb!important;outline-offset:3px}
+.edch-mouse-count{position:absolute;right:-4px;top:-7px;min-width:17px;height:17px;
+ display:grid;place-items:center;font-size:.61rem;color:#fff;border-radius:9px;background:#4e7184}
+.edch-mouse-short{max-width:100%;font-size:.61rem;color:#bfe5e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edch-mouse-inspector{border:1px solid #526b7f;background:#101c28;padding:13px;border-radius:8px;min-width:0}
+.edch-mouse-inspector h5{font-size:.94rem;color:#ffce9d;margin:0 0 10px}
+.edch-mouse-inspector p{font-size:.82rem;color:#b7c8d6}
+.edch-mouse-details{display:grid;gap:6px}
+.edch-mouse-detail-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px;
+ border-bottom:1px solid #354a5d;padding:7px 0}
+.edch-mouse-detail-row strong{font-size:.84rem}
+.edch-mouse-detail-row small{color:#b6cad8;font-size:.76rem}
+.edch-mouse-tag{font-size:.68rem;padding:3px 6px;border-radius:5px;
+ color:#ade4db;border:1px solid #73c0bd}
+.edch-mouse-tag.planned{color:#ffcf9b;border-color:#e5b074}
+.edch-mouse-note{font-size:.78rem;color:#a9bfcf;margin:13px 0 0}
+.edch-mouse-unknown{margin-top:11px;font-size:.79rem;color:#b5cedd}
+.edch-mouse-unknown summary{cursor:pointer}
+.edch-foot-mouse-prepare{margin-top:8px;border-top:1px solid #536779;padding-top:12px}
+.edch-foot-mouse-prepare h5{margin:0 0 8px;color:#f0c393}
+@media(max-width:780px){.edch-mouse-layout{grid-template-columns:1fr}
+ .edch-mouse-shape{margin:0 auto;width:100%;min-height:280px}
+ .edch-mouse-panel{margin:8px 0 14px;padding:12px}}
