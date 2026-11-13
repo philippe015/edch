@@ -153,10 +153,20 @@ export class ControlsPresetEditor {
            this.captureStatus="";
            this.repaint(this.captureMode?"capture":undefined);
         },false, this.editAction===row.action&&this.editSlot===slot?"selected":"");
-        const value=(b?:Bind)=>h("span",{class:b?"edch-c166-bound":"edch-c166-unbound"},b?readKey(b):"— Libre —");
+        const value=(slot:"primary"|"secondary",original?:Bind)=>{
+          const change=this.staged.find(c=>c.action===row.action&&c.slot===slot);
+          return change
+            ?h("div.edch-c1621-current-preview",null,
+              h("strong",null,"Proposé : "+change.device+" · "+change.key),
+              h("small",null,"Avant : "+(original?readKey(original):"Libre")))
+            :h("span",{class:original?"edch-c166-bound":"edch-c166-unbound"},
+              original?readKey(original):"— Libre —");
+        };
         return h("tr",{class:this.editAction===row.action?"edch-c166-current":""},
           h("td",null,h("strong",null,localizedActionLabel(meta,row.action)),h("small",null,row.action)),
-          h("td",null,value(row.primary)),h("td",null,value(row.secondary)),h("td",null,button("primary")," ",button("secondary")));
+          h("td",null,value("primary",row.primary)),
+          h("td",null,value("secondary",row.secondary)),
+          h("td",null,button("primary")," ",button("secondary")));
       })),
     ),
     rows.length>200?h("p.edch-c166-muted",null,`200 sur ${rows.length} commandes affichées : affine la recherche.`):null,
