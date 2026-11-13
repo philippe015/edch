@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const read=(file)=>readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
 test('editor offers in-game categories, profile suggestion and explicit per-slot preview',()=>{
  const content=read('src/views/controls/presetEditor.ts');
- for(const term of ['Vaisseau','VRS','À pied','Interface / cartes','Principale','Secondaire','Préparer les suggestions','Brouillon à valider','controlsSavePresetBatch'])assert.ok(content.includes(term),term);
+ for(const term of ['Vaisseau','VRS','À pied','Interface / cartes','Principale','Secondaire','Préparer les suggestions','Brouillon à valider','controlsSaveNamedPresetBatch'])assert.ok(content.includes(term),term);
  assert.match(content,/window\.confirm\(/);
 });
 test('native batch path retains source read-only and no game input automation',()=>{
