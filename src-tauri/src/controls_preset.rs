@@ -55,6 +55,28 @@ fn prepared_keyboard_key(device: &str, key: &str, modifiers: &[ControlsModifier]
     device == "Keyboard" && modifiers.is_empty() && PREPARED_AZERTY_KEYS.contains(&key)
 }
 
+/// Codes permitted by the v1.6.19 On Foot physical key capture UI.
+ /// Hardware controller IDs and modifiers are intentionally not inferred.
+fn captured_keyboard_key(device: &str, key: &str, modifiers: &[ControlsModifier]) -> bool {
+    if device != "Keyboard" || !modifiers.is_empty() { return false; }
+    let Some(code) = key.strip_prefix("Key_") else { return false; };
+    if code.len() == 1 && code.bytes().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) { return true; }
+    if let Some(function) = code.strip_prefix('F') {
+        if let Ok(n) = function.parse::<u8>() {
+            if (1..=12).contains(&n) && function == n.to_string() { return true; }
+        }
+    }
+    if let Some(num) = code.strip_prefix("Numpad_") {
+        return num.len() == 1 && num.bytes().all(|c| c.is_ascii_digit());
+    }
+    matches!(code,
+        "Space" | "Tab" | "Enter" | "Backspace" | "Delete" | "Insert" |
+        "Home" | "End" | "PageUp" | "PageDown" |
+        "UpArrow" | "DownArrow" | "LeftArrow" | "RightArrow" |
+        "LeftShift" | "RightShift" | "LeftControl" | "RightControl" |
+        "LeftAlt" | "RightAlt"
+    )
+}
 fn input_check(xml: &str, change: &ControlsChange) -> Result<(), String> {
     if !matches!(change.slot.as_str(), "primary"|"secondary") || !token(&change.action,100) {
         return Err("unknown or unsupported action/slot".into());
@@ -63,7 +85,8 @@ fn input_check(xml: &str, change: &ControlsChange) -> Result<(), String> {
         return Err("invalid controller input".into());
     }
     if !known_input(xml, &change.device, &change.key)
-        && !prepared_keyboard_key(&change.device, &change.key, &change.modifiers) {
+        && !prepared_keyboard_key(&change.device, &change.key, &change.modifiers)
+        && !captured_keyboard_key(&change.device, &change.key, &change.modifiers) {
         return Err("input not present in selected source preset; no synthetic HOTAS IDs".into());
     }
     let mut seen=HashSet::new();
@@ -255,6 +278,29 @@ mod tests {
     fn c() -> ControlsChange {ControlsChange{action:"YawLeftButton".into(),slot:"secondary".into(),device:"SaitekX52Pro".into(),key:"Joy_2".into(),modifiers:vec![],replace_existing:false}}
     #[test] fn new_slot_preserves_existing_hotkey(){let s=rewrite_xml(XML,"EDCHPro001",&c()).unwrap();assert!(s.contains("<Primary Device=\"Keyboard\" Key=\"Key_A\" />"));assert!(s.contains("<Secondary Device=\"SaitekX52Pro\" Key=\"Joy_2\" />"));assert!(s.contains("<HyperSuperCombination>"));}
     #[test] fn refuse_override_by_default(){let mut x=c();x.slot="primary".into();assert!(rewrite_xml(XML,"EDCHPro001",&x).is_err());x.replace_existing=true;assert!(rewrite_xml(XML,"EDCHPro001",&x).is_ok());}
+    #[test] fn captured_keyboard_codes_are_strictly_bounded() {
+        let xml = XML;
+        let mut change = c();
+        change.device = "Keyboard".into();
+        change.modifiers.clear();
+        for key in ["Key_A", "Key_0", "Key_9", "Key_F1", "Key_F12",
+                    "Key_Numpad_8", "Key_Enter", "Key_Backspace", "Key_LeftArrow",
+                    "Key_RightShift"] {
+            change.key = key.into();
+            assert!(input_check(xml, &change).is_ok(), "rejected captured key {key}");
+        }
+        for key in ["Key_F0", "Key_F13", "Key_Numpad_88", "Key_Unknown",
+                    "Key_a", "Key_Period", "Joy_5"] {
+            change.key = key.into();
+            assert!(input_check(xml, &change).is_err(), "accepted unapproved {key}");
+        }
+        change.key = "Key_A".into();
+        change.device = "GamePad".into();
+        assert!(input_check(xml, &change).is_err(), "must not invent gamepad input");
+        change.device = "Keyboard".into();
+        change.modifiers.push(ControlsModifier{device:"Keyboard".into(), key:"Key_LeftShift".into()});
+        assert!(input_check(xml, &change).is_err(), "must not invent combos");
+    }
     #[test] fn prepared_azerty_key_is_allowed_without_prior_use() {
         let mut x=c();
         x.device="Keyboard".into();

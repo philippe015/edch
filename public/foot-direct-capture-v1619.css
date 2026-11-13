@@ -1,0 +1,23 @@
+/* EDCH v1.6.19 — focused, accessible keyboard and mouse capture overlay. */
+.edch-c166-capture-overlay{
+  position:fixed;inset:0;z-index:2147483000;
+  display:grid;place-items:center;padding:20px;
+  color:#ecf3f7;background:rgba(5,13,23,.87);
+  outline:none;cursor:crosshair;backdrop-filter:blur(4px)
+}
+.edch-c166-capture-overlay:focus-visible{outline:3px solid #ffce89;outline-offset:-4px}
+.edch-c166-capture-dialog{
+  width:min(100%,650px);padding:28px 25px;border-radius:12px;
+  border:2px solid #f0ae63;background:#172735;
+  box-shadow:0 12px 45px #0009;text-align:center;
+}
+.edch-c166-capture-dialog h4{font-size:1.18rem;margin:0 0 13px;color:#ffcca0}
+.edch-c166-capture-dialog p{font-size:.96rem;line-height:1.55;margin:0 0 12px}
+.edch-c166-capture-error{background:#39291f;border:1px solid #ffb86b;border-radius:6px;
+ padding:10px;font-size:.87rem;color:#ffe4c4}
+.edch-c166-capture-cancel{margin-top:7px;padding:10px 20px!important;
+ color:#eaf1f8!important;background:#283849!important;
+ border:1px solid #96a8b7!important;border-radius:7px!important;cursor:pointer}
+.edch-c166-capture-cancel:focus-visible{outline:2px solid #ffcf9d;outline-offset:3px}
+@media(max-width:650px){.edch-c166-capture-overlay{padding:10px}
+  .edch-c166-capture-dialog{padding:19px 13px}}
