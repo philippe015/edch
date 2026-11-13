@@ -3,7 +3,7 @@
  */
 import { type BindsMeta, type Bind, parseBinds, parseXml, fileForPreset, groupOf } from "../../features/controls/binds.js";
 import { localizedActionLabel} from "../../features/controls/actionLabels.js";
-import { controlsSavePresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
+import { controlsSavePresetBatch, controlsSaveNamedPresetBatch, isRemote, isTauri, readOptionFile, listOptionFiles, optionsDir, revealPath, type OptionFile } from "../../platform/bridge.js";
 import {
   bindingKey, catalogRows, inputCatalog, isStagedAssignmentValid, occupancyWarnings,
   type PresetAssignment, type SuggestedProfile,
@@ -21,6 +21,8 @@ import { virtualFootMouse } from "./virtualFootMouse.js";
 import {ENERGY_LINK_RELATED,planEnergyLink} from "../../features/controls/energyLink.js";
 import { ON_FOOT_IN_GAME_STEPS, inGameOnFootStatus, onFootPresetFromStartFile, type InGameOnFootStatus } from "../../features/controls/inGameOnFoot.js";
 import { digitalMouseInputs, recommendFootMouse } from "../../features/controls/virtualFootMouse.js";
+import { namedPreset, matchedPresetFiles, safeEdchPresetName } from "../../features/controls/namedPresets.js";
+import { prepareCompleteFootAzerty } from "../../features/controls/completeFootPresets.js";
 import { captureKeyboardForFoot, captureMouseForFoot, captureVirtualFootKey, type CapturedDigitalInput } from "../../features/controls/footDirectCapture.js";
 import { xboxControllerDiagram } from "./xboxControllerDiagram.js";
 import { isXboxDevice, xboxControl, recommendXboxProfile, XBOX_STYLES } from "../../features/controls/xboxIntelligentProfiles.js";
@@ -59,6 +61,8 @@ export class ControlsPresetEditor {
   private inGameGuideMessage="";
   private inGameGuideBusy=false;
   private profile:SuggestedProfile="balanced";
+  private customPresetName="";
+  private confirmNamedUpdate=false;
   private editAction="";
   private editSlot:"primary"|"secondary"="secondary";
   private editInput="";
@@ -96,6 +100,11 @@ export class ControlsPresetEditor {
       ?recommendFootMouse(src.actions,src.binds,meta):undefined;
     const energyLinkPlan=this.mode==="foot"&&src
       ?planEnergyLink(src.actions,src.binds,meta):undefined;
+    const completeFoot=src&&this.mode==="foot"&&this.family==="azerty"
+      ?prepareCompleteFootAzerty(this.profile,src.actions,src.binds,meta):undefined;
+    const targetName=this.customPresetName || namedPreset(this.mode,this.family,this.profile);
+    const sameNamedFiles=matchedPresetFiles(targetName,names);
+    const existingNamed=sameNamedFiles.length>0;
     const deviceAdvice=src&&this.family!=="xbox"
       ?recommendScopedProfile(this.mode,this.family,this.profile,src.actions,src.binds,meta):undefined;
     const xboxAdvice=src&&this.family==="xbox"
@@ -106,8 +115,12 @@ export class ControlsPresetEditor {
     if (!inputs.some(x=>bindingKey(x)===this.editInput))this.editInput=inputs.length?bindingKey(inputs[0]):"";
     const editsWarnings=src?[...new Set([...occupancyWarnings(src.binds,this.staged,meta),
       ...scopedInputWarnings(src.binds,this.staged,meta)])]:[];
-    const canSave=Boolean(src && this.staged.length && this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
-      && (!editsWarnings.length || this.acknowledgeWarnings) && isTauri() && !isRemote() && !this.loading && !this.saving);
+    const canSave=Boolean(src&&this.staged.length && this.staged.length<=96&&
+      this.staged.every(x=>isStagedAssignmentValid(x,src.actions,src.binds))
+      && safeEdchPresetName(targetName)
+      && (!existingNamed||this.confirmNamedUpdate)
+      && (!editsWarnings.length || this.acknowledgeWarnings) &&
+      isTauri() && !isRemote() && !this.loading && !this.saving);
     const selectedAction=src?.actions.includes(this.editAction)?this.editAction:"";
     const old=src?.binds.find(b=>b.action===selectedAction&&b.slot===this.editSlot);
     const selectedInput=inputs.find(x=>bindingKey(x)===this.editInput);
@@ -118,7 +131,7 @@ export class ControlsPresetEditor {
         this.attempted="";this.staged=[];this.editAction="";this.message="";this.inGameStatus=null;this.captureMode=false;this.repaint();},
     },...names.map(name=>choose(name,name,name===this.selected))));
     const heading=h("div.edch-c166-heading",null,
-      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · clavier visible pendant la capture v1.6.20"),
+      h("div",null,h("p.edch-c166-eyebrow",null,"ELITE DANGEROUS · CONFIGURATION"),h("h3",null,"Commandes Elite Dangerous · profils nommés et AZERTY étendu v1.6.21"),
         h("p.edch-c166-muted",null,"Affectations du profil, suggestions locales et création d'un nouveau préréglage pour le jeu.")),
       h("div.edch-c166-hero-right",null,sourceSelect,h("span.edch-c166-chip",null,
         this.loading?"Lecture…":this.saving?"Enregistrement…":src?`${src.actions.length} commandes · ${src.binds.length} affectations`:"Profil non chargé")));
@@ -127,7 +140,7 @@ export class ControlsPresetEditor {
         onclick:()=>{
           if(this.family===x.id)return;
           if(this.staged.length&&!window.confirm("Changer de périphérique et abandonner le brouillon non enregistré ?"))return;
-          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";this.captureMode=false;
+          this.family=x.id;this.staged=[];this.acknowledgeWarnings=false;this.editInput="";this.message="";this.captureMode=false;this.customPresetName="";this.confirmNamedUpdate=false;
           this.repaint();
         }},x.id==="azerty"&&this.mode==="foot"?"Clavier AZERTY + souris":x.label)));
     const search=h("label.edch-c166-search",null,"Rechercher",h("input",{type:"search",value:this.query,maxLength:120,
@@ -269,13 +282,17 @@ export class ControlsPresetEditor {
         ...USAGE_STYLES.map(style=>{
           const template=PREPARED_TEMPLATES.find(t=>t.scope===this.mode&&t.usage===style.id)!;
           const prepared=src&&this.family==="azerty"
-            ?prepareAzerty(this.mode,style.id,src.actions,src.binds,meta):undefined;
+            ?this.mode==="foot"
+              ?prepareCompleteFootAzerty(style.id,src.actions,src.binds,meta)
+              :prepareAzerty(this.mode,style.id,src.actions,src.binds,meta)
+            :undefined;
           const intelligent=src&&this.family==="xbox"
             ?recommendXboxProfile(this.mode,style.id,src.actions,src.binds,meta):undefined;
           const inferred=src&&this.family==="hotas"
             ?recommendScopedProfile(this.mode,this.family,style.id,src.actions,src.binds,meta):undefined;
+          // The complete on-foot planner already includes verified mouse suggestions.
           const footMouse=src&&this.mode==="foot"&&this.family==="azerty"
-            ?recommendFootMouse(src.actions,src.binds,meta):undefined;
+            ?undefined:undefined;
           const changes=[...(prepared?.changes??intelligent?.changes??inferred?.changes??[]),
             ...(footMouse?.changes??[])];
           const covered=(prepared?.covered??intelligent?.covered??inferred?.covered??0)+(footMouse?.covered??0);
@@ -298,6 +315,7 @@ export class ControlsPresetEditor {
             h("button",{type:"button",disabled:!src||this.saving||this.loading,
               onclick:()=>{
                 this.profile=style.id;
+                this.customPresetName="";this.confirmNamedUpdate=false;
                 if(changes.length)this.stageAdvice({changes});
                 else{
                   this.message=this.family==="azerty"
@@ -316,7 +334,7 @@ export class ControlsPresetEditor {
       h("h4",null,"Profils intelligents · "+INPUT_FAMILIES.find(x=>x.id===this.family)!.label),
       h("p.edch-c166-muted",null,"Suggestions locales et vérifiables pour "+currentContext.label+". Aucun numéro HOTAS ou Xbox n'est inventé."),
       h("label.edch-c166-field",null,"Profil conseillé",h("select",{value:this.profile,disabled:this.loading||this.saving,
-        onchange:(e:Event)=>{this.profile=(e.target as HTMLSelectElement).value as SuggestedProfile;this.repaint();}},
+        onchange:(e:Event)=>{this.profile=(e.target as HTMLSelectElement).value as SuggestedProfile;this.customPresetName="";this.confirmNamedUpdate=false;this.repaint();}},
         ...USAGE_STYLES.map(x=>choose(x.label,x.id,x.id===this.profile)))),
       (this.family==="xbox"?xboxAdvice:deviceAdvice)?h("p",null,
         this.family==="xbox"
@@ -333,8 +351,8 @@ export class ControlsPresetEditor {
             `${localizedActionLabel(meta,item.assignment.action)} → ${item.assignment.device} / ${item.assignment.key} : ${item.reason}`))):null,
       ...(this.family==="xbox"?xboxAdvice?.warnings??[]:deviceAdvice?.warnings??[])
         .map(w=>h("p.edch-c166-muted",null,w)),
-      btn("Préparer les suggestions",()=>this.stageAdvice(this.family==="xbox"?xboxAdvice:deviceAdvice),
-        !(this.family==="xbox"?xboxAdvice:deviceAdvice)?.changes.length||this.loading||this.saving,"primary"),
+      btn("Préparer les suggestions",()=>this.stageAdvice(this.family==="xbox"?xboxAdvice:completeFoot??deviceAdvice),
+        !(this.family==="xbox"?xboxAdvice:completeFoot??deviceAdvice)?.changes.length||this.loading||this.saving,"primary"),
       this.mode==="foot"&&this.family==="azerty"&&footMousePlan?
         h("div.edch-foot-mouse-prepare",null,
           h("h5",null,"Souris à pied · raccourcis sûrs"),
@@ -345,6 +363,49 @@ export class ControlsPresetEditor {
           h("p.edch-c166-muted",null,
             "Uniquement les boutons présents dans le fichier source. Aucun axe ni touche existante remplacé.")):null,
       h("p.edch-c166-muted",null,"Le brouillon ne modifie aucun fichier. Les touches occupées et les axes analogiques sont préservés."));
+    const namingPanel=h("section.edch-named-preset",{role:"region","aria-label":"Nom du préréglage Elite Dangerous"},
+      h("h4",null,"Nom du préréglage dans le jeu"),
+      h("p.edch-c166-muted",null,
+        "Le nom ci-dessous sera identique dans le fichier .binds et dans le menu Odyssey. Un même nom est réutilisé au lieu de créer EDCHPro0001, EDCHPro0002…"),
+      h("label.edch-c166-field",null,"Nom enregistré dans Odyssey",
+        h("input",{type:"text",maxLength:40,value:targetName,spellcheck:false,
+          "aria-label":"Nom du profil nommé Odyssey",
+          oninput:(e:Event)=>{
+            this.customPresetName=(e.target as HTMLInputElement).value.toUpperCase();
+            this.confirmNamedUpdate=false;
+          },
+          onblur:()=>this.repaint(),
+        })),
+      !safeEdchPresetName(targetName)
+        ?h("p.edch-c166-warning",null,
+          "Nom invalide : commence par EDCH_ et utilise uniquement A–Z, 0–9 et _ (40 caractères maximum)."):null,
+      existingNamed?h("div.edch-named-existing",null,
+        h("strong",null,"Ce nom existe déjà : "+sameNamedFiles.join(" · ")),
+        h("label",null,h("input",{type:"checkbox",checked:this.confirmNamedUpdate,
+          onchange:(e:Event)=>{this.confirmNamedUpdate=(e.target as HTMLInputElement).checked;this.repaint();}}),
+          " Mettre à jour ce profil nommé. Sauvegarder automatiquement l'ancienne version dans EDCH_Backups avant remplacement.")):null,
+      h("p.edch-c166-muted",null,
+        "Les anciens EDCHPro restent intacts. Pour éviter des noms en double, conserve ce même nom pour les mises à jour de ce réglage."),
+    );
+    const footCoverage=completeFoot?h("section.edch-foot-coverage",null,
+      h("h4",null,"Couverture des commandes à pied · AZERTY étendu"),
+      h("p",null,
+        completeFoot.allActions+" actions À pied reconnues · "+completeFoot.changes.length+
+        " propositions clavier/souris · "+completeFoot.covered+" déjà conformes · "+
+        completeFoot.preservedAxes+" axe(s) conservé(s)."),
+      h("p.edch-c166-muted",null,
+        completeFoot.unassigned.length+" action(s) sans affectation numérique après application des propositions."),
+      completeFoot.unassigned.length?h("details",null,
+        h("summary",null,"Afficher les commandes encore sans touche"),
+        ...completeFoot.unassigned.map(a=>h("p.edch-c166-muted",null,
+          localizedActionLabel(meta,a)+" ("+a+")"))):null,
+      completeFoot.skipped.length?h("details",null,
+        h("summary",null,completeFoot.skipped.length+" proposition(s) non appliquées et causes"),
+        ...completeFoot.skipped.map(x=>h("p.edch-c166-muted",null,
+          localizedActionLabel(meta,x.action)+" : "+x.key+" — "+x.reason))):null,
+      h("p.edch-c166-muted",null,
+        "Les commandes sans touche ou absentes ne sont jamais présentées comme configurées. Vérifie les avertissements avant de créer un profil."),
+    ):null;
     const draftBox=h("section.edch-c166-pane",null,h("h4",null,`Brouillon à valider (${this.staged.length})`),
       this.staged.length?h("div.edch-c166-draft",null,...this.staged.map((change,index)=>h("div.edch-c166-draft-line",null,
         h("span",null,h("strong",null,localizedActionLabel(meta,change.action)),
@@ -358,11 +419,13 @@ export class ControlsPresetEditor {
         h("label.edch-c166-ack",null,h("input",{type:"checkbox",checked:this.acknowledgeWarnings,
           onchange:(e:Event)=>{this.acknowledgeWarnings=(e.target as HTMLInputElement).checked;this.repaint();}}),
           " J'ai vérifié les touches partagées et j'accepte ce brouillon")):null,
+      namingPanel,
+      footCoverage,
       h("div.edch-c166-actions",null,
-        btn(this.saving?"Création du profil…":"Créer un nouveau profil pour Elite Dangerous",()=>{void this.save();},!canSave,"primary"),
+        btn(this.saving?"Enregistrement…":existingNamed?"Mettre à jour le préréglage nommé":"Créer le préréglage nommé",()=>{void this.save();},!canSave,"primary"),
         btn("Annuler le brouillon",()=>{this.staged=[];this.acknowledgeWarnings=false;this.repaint();},!this.staged.length||this.saving)),
       this.message?h("p",{role:"status",class:"edch-c166-status"},this.message):null,
-      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer le profil ; sélectionne ensuite EDCHPro dans les préréglages du jeu (Général, Vaisseau, VRS et À pied selon la catégorie)."));
+      h("p.edch-c166-muted",null,"Les axes restent inchangés. Ferme Elite Dangerous et son lanceur avant de créer ce profil nommé ; sélectionne ensuite son nom exact dans les préréglages du jeu pour le contexte concerné."));
     const hotas = this.family==="hotas" && this.mode==="ship" ? this.hotasStudio.render(src?.binds ?? [], (candidate: Bind) => {
       const input = inputCatalog(src?.binds ?? []).find(b => bindingKey(b) === bindingKey(candidate));
       if (!input) return;
@@ -659,16 +722,23 @@ export class ControlsPresetEditor {
     const warnings=[...new Set([...occupancyWarnings(source.binds,this.staged,ctx.meta),
       ...scopedInputWarnings(source.binds,this.staged,ctx.meta)])];
     if(warnings.length&&!this.acknowledgeWarnings)return;
-    if(!window.confirm(`Créer un NOUVEAU profil EDCHPro avec ${this.staged.length} modification(s) ?\n\nProfil source : ${source.filename}\nLes profils existants restent intacts.\nFerme Elite Dangerous et son lanceur avant d'enregistrer.`))return;
+    const name=this.customPresetName||namedPreset(this.mode,this.family,this.profile);
+    if(!safeEdchPresetName(name)) {this.message="Nom de préréglage invalide.";this.repaint();return;}
+    const existing=matchedPresetFiles(name,ctx.files.filter(f=>f.folder==="Bindings").map(f=>f.name)).length>0;
+    if(existing&&!this.confirmNamedUpdate){
+      this.message="Ce nom existe déjà : confirme sa mise à jour et sa sauvegarde.";this.repaint();return;
+    }
+    if(!window.confirm(`${existing?"METTRE À JOUR":"CRÉER"} le profil nommé ${name} avec ${this.staged.length} attribution(s) ?\n\nSource : ${source.filename}\n${existing?"L'ancien préréglage nommé sera sauvegardé dans EDCH_Backups.":"Le fichier source reste intact."}\n\nVérifie le brouillon. Elite Dangerous et le lanceur doivent être fermés.`))return;
     this.saving=true;this.repaint();
     try{
-      const out=await controlsSavePresetBatch(source.filename,this.staged);
-      this.staged=[];this.acknowledgeWarnings=false;
+      const out=await controlsSaveNamedPresetBatch(
+        source.filename,this.staged,name,existing,this.mode==="foot"&&this.family==="azerty");
+      this.staged=[];this.acknowledgeWarnings=false;this.confirmNamedUpdate=false;
       this.lastCreated={preset:out.preset,filename:out.filename,path:out.path};
       this.selected=out.filename;this.source=undefined;this.attempted="";
       this.inGameStatus=null;
       this.inGameGuideMessage="Profil prêt : démarre Odyssey, ouvre Options → Commandes → À pied et sélectionne « "+out.preset+" ».";
-      this.message="Profil "+out.preset+" créé sans écraser le fichier source. Sélectionne-le et applique-le dans les commandes À pied du jeu.";
+      this.message="Profil nommé "+out.preset+" enregistré (source préservée ou ancien profil sauvegardé). Sélectionne-le et applique-le dans les commandes correspondantes du jeu.";
       await ctx.reload();
     }catch(e){this.message=`Création du profil refusée : ${String(e)}`;}
     finally{this.saving=false;this.repaint();}
