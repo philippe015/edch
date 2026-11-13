@@ -23,10 +23,11 @@ const NAMED_CODES:Readonly<Record<string,string>>={
  * Ctrl/Alt/Meta combinations require dedicated .binds modifier support and are refused.
  */
 export function captureKeyboardForFoot(e:CapturableKeyboardEvent):CapturedDigitalInput|null {
-  if(e.repeat||e.metaKey||e.ctrlKey||e.altKey||["Dead","Process","AltGraph","Unidentified"].includes(e.key))return null;
+  if(e.repeat||e.metaKey||["Dead","Process","AltGraph","Unidentified"].includes(e.key))return null;
   const named=NAMED_CODES[e.code];
-  if(named && /^(Shift|Control|Alt)/.test(e.key))
+  if(named && /^(Shift|Control|Alt)$/.test(e.key))
     return {device:"Keyboard",key:"Key_"+named,label:named};
+  if(e.ctrlKey||e.altKey)return null;
   if(e.shiftKey && !/^Digit[0-9]$/.test(e.code))return null;
   let key="";
   if(/^[a-z]$/i.test(e.key))key="Key_"+e.key.toUpperCase();
