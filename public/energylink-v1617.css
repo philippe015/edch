@@ -1,0 +1,20 @@
+/* EDCH Cyberpunk Philou v1.6.17 — on-foot Energy Link shortcut and explanation */
+.edch-energylink{margin:12px 16px 18px;padding:15px 16px;background:#172332;
+ border:1px solid #bd8955;border-radius:9px;color:#e9f1f8}
+.edch-energylink-head h4{margin:0 0 7px;color:#ffd2a1;font-size:1.06rem}
+.edch-energylink-head p{margin:0 0 13px;color:#d2e0eb;font-size:.86rem}
+.edch-energylink-related{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.edch-energylink-action{border:1px solid #4e6576;background:#1b2d3c;border-radius:7px;
+ padding:10px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.edch-energylink-action>div{display:grid;gap:4px;min-width:0}
+.edch-energylink-action strong{font-size:.86rem;color:#f6d2ac}
+.edch-energylink-action small{font-size:.74rem;color:#bbcddd}
+.edch-energylink-current{font-size:.79rem;overflow-wrap:anywhere;color:#a8e1d7}
+.edch-energylink-action button,.edch-energylink-recommend button{flex-shrink:0}
+.edch-energylink-recommend{padding:10px 0 6px}
+.edch-energylink-recommend p{margin:0 0 8px}
+@media(max-width:900px){
+ .edch-energylink{margin:8px 0;padding:12px}
+ .edch-energylink-related{grid-template-columns:1fr}
+ .edch-energylink-action{flex-wrap:wrap}
+}
