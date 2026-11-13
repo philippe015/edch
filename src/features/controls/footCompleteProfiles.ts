@@ -161,3 +161,18 @@ export function planCompleteFoot(
   return {template,changes:pending,covered,available,skipped,warnings,
     unassigned,totalDigital:digital.length,expected:rules,namedPreset:FOOT_NAMED_PRESET[usage]};
 }
+
+/** Check the intended ZQSD outcome, including values kept from the original profile.
+ * A preset must not be advertised as AZERTY-complete if a movement rule was skipped.
+ */
+export function missingFootMovement(
+  original:readonly Bind[],staged:readonly PresetAssignment[],
+):readonly KeyRule[] {
+  const moved=new Set(staged.filter(s=>s.replaceExisting).map(s=>s.action+"|"+s.slot));
+  return FOOT_ESSENTIAL_RULES.slice(0,4).filter(rule=>{
+    const hasNew=staged.some(s=>s.action===rule.action&&s.device==="Keyboard"&&s.key===rule.key&&!s.modifiers.length);
+    const hasOld=original.some(b=>b.action===rule.action&&b.device==="Keyboard"&&
+      b.key===rule.key&&!b.modifiers.length&&!moved.has(b.action+"|"+b.slot));
+    return !hasNew&&!hasOld;
+  });
+}
