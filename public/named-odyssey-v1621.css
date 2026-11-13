@@ -1,0 +1,31 @@
+/* EDCH v1.6.21: persistent named Odyssey presets and completeness preview. */
+.edch-named-preset,.edch-foot-coverage{
+  padding:13px;margin:13px 0;background:#182b3c;border:1px solid #5a7386;
+  border-radius:9px;color:#ebf1f5;
+}
+.edch-named-preset h4,.edch-foot-coverage h4{
+  margin:0 0 9px;color:#ffcc9b;font-size:.98rem
+}
+.edch-named-preset p,.edch-foot-coverage p{
+  line-height:1.5;font-size:.8rem
+}
+.edch-named-preset input[type="text"]{
+  display:block;width:min(100%,550px);padding:10px 12px;border:1px solid #78a7b3;
+  background:#0f1e2b;color:#e8f8f4;border-radius:7px;font-weight:750;
+  letter-spacing:.035em;margin:6px 0 10px;
+}
+.edch-named-existing{border:1px solid #f0b36e;background:#42311e;
+  padding:10px;border-radius:7px;display:grid;gap:10px;margin:8px 0}
+.edch-named-existing strong{font-size:.8rem;overflow-wrap:anywhere}
+.edch-named-existing label{display:flex;align-items:flex-start;gap:9px;
+  color:#ffdfb5;font-size:.82rem;line-height:1.4;cursor:pointer}
+.edch-named-existing input[type="checkbox"]{margin-top:2px;flex-shrink:0}
+.edch-foot-coverage details{padding:7px 0;border-top:1px solid #3f5c73;
+  color:#c9deec;max-height:220px;overflow:auto}
+.edch-foot-coverage summary{cursor:pointer;color:#ecc39a;font-weight:650}
+.edch-foot-coverage details p{margin:6px 0;color:#c8d8e4}
+
+.edch-named-legacy{margin:10px 0;padding:10px;background:#111f2d;border:1px solid #637a8d;border-radius:7px}
+.edch-named-legacy summary{color:#ffd2a0;cursor:pointer;font-size:.87rem;font-weight:700}
+.edch-named-legacy>p{margin:7px 0;overflow-wrap:anywhere}
+.edch-named-legacy button{margin-top:7px}

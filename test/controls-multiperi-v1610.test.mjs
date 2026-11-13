@@ -127,7 +127,7 @@ test("UI contract: three top level tabs, input family switch, advanced tools pre
   assert.ok(editor.includes("recommendScopedProfile"));
   assert.ok(editor.includes("INPUT_FAMILIES"));
   assert.ok(editor.includes("Préparer les suggestions"));
-  assert.ok(editor.includes("controlsSavePresetBatch"));
+  assert.ok(editor.includes("controlsSaveNamedPresetBatch"));
   assert.ok(editor.includes("window.confirm("));
 });
 

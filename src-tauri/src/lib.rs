@@ -91,6 +91,8 @@ pub fn run() {
             foot_binds::foot_save_preset,
             controls_preset::controls_save_preset,
             controls_preset::controls_save_preset_batch,
+            controls_preset::controls_save_named_preset_batch,
+            controls_preset::controls_archive_legacy_presets,
             hotas::hotas_devices,
             hotas::hotas_capture,
             report_html::save_html_report,
