@@ -24,3 +24,8 @@
   color:#c9deec;max-height:220px;overflow:auto}
 .edch-foot-coverage summary{cursor:pointer;color:#ecc39a;font-weight:650}
 .edch-foot-coverage details p{margin:6px 0;color:#c8d8e4}
+
+.edch-named-legacy{margin:10px 0;padding:10px;background:#111f2d;border:1px solid #637a8d;border-radius:7px}
+.edch-named-legacy summary{color:#ffd2a0;cursor:pointer;font-size:.87rem;font-weight:700}
+.edch-named-legacy>p{margin:7px 0;overflow-wrap:anywhere}
+.edch-named-legacy button{margin-top:7px}
