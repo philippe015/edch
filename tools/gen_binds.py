@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build public/data/binds.json from EDRefCard's binding metadata (MIT, vendored in
-tools/sources/edrefcard) and the game's DeviceMappings.xml.
+tools/sources/edrefcard from brammmers/edrefcard2, the maintained continuation of
+richardbuckle/EDRefCard) and the game's DeviceMappings.xml.
 
 Run:  python3 tools/gen_binds.py
 """
@@ -17,10 +18,17 @@ SRC = ROOT / "tools" / "sources" / "edrefcard"
 OUT = ROOT / "public" / "data" / "binds.json"
 
 
-def load_bindings_data():
-    spec = importlib.util.spec_from_file_location("bindingsData", SRC / "bindingsData.py")
+def load_module(name: str):
+    spec = importlib.util.spec_from_file_location(name, SRC / f"{name}.py")
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # plain data module: dicts only
+    spec.loader.exec_module(mod)  # plain data modules: dicts only
+    return mod
+
+
+def load_bindings_data():
+    """Devices and templates (bindingsData.py), and control names (controlsData.py)."""
+    mod = load_module("bindingsData")
+    mod.controls = load_module("controlsData").controls
     return mod
 
 
@@ -105,15 +113,28 @@ def main() -> None:
         devices[n] = {"label": humanize(n), **NICE.get(n, {}), "kind": kind}
     # Device templates (EDRefCard): which picture a device uses and where each control's
     # legend box sits on it. Pictures are loaded at runtime from EDRefCard's GitHub, not bundled.
-    sizes = {"vkb-kosmosima-scg-left": [3879, 2182], "x45": [5120, 2880]}
+    # Pictures that aren't 3840 × 2160 (checked on EDRefCard's files when updating the copy).
+    sizes = {
+        "vkb-kosmosima-scg-left": [3879, 2182],
+        "x45": [5120, 2880],
+        "vpc-controlpanel2": [3790, 2091],
+        "winwing-ursa-minor-fighter-left": [4448, 2145],
+    }
+    # Templates without a picture in EDRefCard: left out rather than shown broken.
+    pictures = {line.strip() for line in (SRC / "PICTURES").read_text().splitlines() if line.strip()}
     handled = {}
     for name, sd in data.supportedDevices.items():
         for dev in sd["HandledDevices"]:
             handled.setdefault(dev, sd["Template"])
     templates = {}
-    for dev, detail in data.hotasDetails.items():
-        tpl = handled.get(dev)
-        if not tpl or tpl == "keyboard":
+    for full_key, detail in data.hotasDetails.items():
+        # "231D012D::0" / "::1": two devices with the same id, told apart by the order the game
+        # lists them (DeviceIndex). EDCH doesn't read that order yet: the first one stands for both.
+        dev, _, index = full_key.partition("::")
+        if index not in ("", "0") or dev in templates:
+            continue
+        tpl = handled.get(full_key)
+        if not tpl or tpl == "keyboard" or tpl not in pictures:
             continue
         boxes = {}
         for key, box in detail.items():
@@ -122,7 +143,7 @@ def main() -> None:
         templates[dev] = {"name": detail.get("displayName", dev), "image": tpl, "size": sizes.get(tpl, [3840, 2160]), "boxes": boxes}
     payload = {
         "templates": templates,
-        "templateBase": "https://raw.githubusercontent.com/richardbuckle/EDRefCard/" + (SRC / "COMMIT").read_text().strip() + "/www/res/",
+        "templateBase": "https://raw.githubusercontent.com/brammmers/edrefcard2/" + (SRC / "COMMIT").read_text().strip() + "/www/res/",
         "controls": controls,
         "keymap": data.keymap,
         "devices": devices,
