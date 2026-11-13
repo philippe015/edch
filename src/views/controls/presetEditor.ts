@@ -714,15 +714,30 @@ export class ControlsPresetEditor {
   }
   private async save(){
     const ctx=this.context,source=this.source;
-    if(!ctx||!source||source.filename!==this.selected||!this.staged.length||this.saving||this.loading)return;
+    if(!ctx||!source||source.filename!==this.selected||(!this.staged.length&&!this.isPreparedNamed)||this.saving||this.loading)return;
     if(!this.staged.every(c=>isStagedAssignmentValid(c,source.actions,source.binds)))return;
+    const name=this.requestedPresetName||
+      suggestedPresetName(this.mode,this.family,this.profile,this.isPreparedNamed);
+    if(!/^EDCH_[A-Za-z0-9_]{1,35}$/.test(name)||name.length>40){
+      this.message="Nom invalide : utilise EDCH_ suivi de caractères ASCII simples (lettres, chiffres, _).";
+      this.repaint();return;
+    }
+    if(this.staged.length>64){
+      this.message="Il y a trop d'affectations préparées (maximum 64).";this.repaint();return;
+    }
+    const missing=this.mode==="foot"&&this.family==="azerty"&&this.isPreparedNamed
+      ?missingFootMovement(source.binds,this.staged):[];
+    if(missing.length){
+      this.message="Profil non créé : ZQSD incomplet ("+missing.map(r=>r.action+" → "+r.key).join(", ")+").";
+      this.repaint();return;
+    }
     const warnings=[...new Set([...occupancyWarnings(source.binds,this.staged,ctx.meta),
       ...scopedInputWarnings(source.binds,this.staged,ctx.meta)])];
     if(warnings.length&&!this.acknowledgeWarnings)return;
-    if(!window.confirm(`Créer un NOUVEAU profil EDCHPro avec ${this.staged.length} modification(s) ?\n\nProfil source : ${source.filename}\nLes profils existants restent intacts.\nFerme Elite Dangerous et son lanceur avant d'enregistrer.`))return;
+    if(!window.confirm(`Créer un NOUVEAU profil « ${name} » avec ${this.staged.length} modification(s) vérifiée(s) ?\n\nProfil source : ${source.filename}\nLes profils existants restent intacts.\nFerme Elite Dangerous et son lanceur avant d'enregistrer.`))return;
     this.saving=true;this.repaint();
     try{
-      const out=await controlsSavePresetBatch(source.filename,this.staged);
+      const out=await controlsSavePresetBatch(source.filename,this.staged,name);
       this.staged=[];this.acknowledgeWarnings=false;
       this.lastCreated={preset:out.preset,filename:out.filename,path:out.path};
       this.selected=out.filename;this.source=undefined;this.attempted="";
